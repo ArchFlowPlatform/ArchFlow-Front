@@ -1,6 +1,5 @@
 import { z } from "zod"
-
-import { createApiResponseSchema } from "@/services/http/api-response"
+import { createEnvelopeSchema } from "@/lib/zod"
 import type { HomeStatus } from "@/features/home/types/home.types"
 
 export const HomeStatusSchema: z.ZodType<HomeStatus> = z.object({
@@ -8,4 +7,4 @@ export const HomeStatusSchema: z.ZodType<HomeStatus> = z.object({
   updatedAt: z.string().datetime(),
 })
 
-export const HomeStatusResponseSchema = createApiResponseSchema(HomeStatusSchema)
+export const HomeStatusResponseSchema = createEnvelopeSchema(HomeStatusSchema)

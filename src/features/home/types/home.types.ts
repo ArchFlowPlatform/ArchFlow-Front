@@ -1,4 +1,4 @@
-import type { ApiResponse } from "@/types/api.types"
+import type { ApiResponse } from "@/types/api-response"
 
 export interface HomeStatus {
   message: string
