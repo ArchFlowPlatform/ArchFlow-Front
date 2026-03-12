@@ -1,4 +1,5 @@
 import { PageShell } from "@/components/shared/page-shell"
+import { ThemeToggleHint } from "@/components/shared/theme-toggle-hint"
 
 import { HomeComponentMap } from "@/features/home/components/home-component-map"
 import { HomeHero } from "@/features/home/components/home-hero"
@@ -12,9 +13,7 @@ export function HomePage() {
         <HomeStatusPanel />
       </div>
       <HomeComponentMap />
-      <div className="font-mono text-xs text-muted-foreground">
-        Press <kbd>d</kbd> to toggle dark mode.
-      </div>
+      <ThemeToggleHint />
     </PageShell>
   )
 }

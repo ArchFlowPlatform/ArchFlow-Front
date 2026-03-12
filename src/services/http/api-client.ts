@@ -7,32 +7,38 @@ import type { ApiError } from "@/types/api.types"
 const DEFAULT_HEADERS = {
   Accept: "application/json",
   "Content-Type": "application/json",
+} as const
+
+const ERROR_CODE_FALLBACK = "REQUEST_FAILED"
+const FALLBACK_MESSAGE = "Request failed."
+
+function isApiErrorPayload(value: unknown): value is Record<string, unknown> & { error: object } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "error" in value &&
+    value.error !== null &&
+    typeof value.error === "object"
+  )
 }
 
 function mapAxiosError(error: AxiosError<unknown>): ApiError {
   const responseData = error.response?.data
-  const fallbackMessage = error.message || "Request failed."
+  const message = error.message || FALLBACK_MESSAGE
 
-  if (
-    responseData &&
-    typeof responseData === "object" &&
-    "error" in responseData &&
-    responseData.error &&
-    typeof responseData.error === "object"
-  ) {
+  if (responseData && isApiErrorPayload(responseData)) {
     const apiError = responseData.error as Partial<ApiError>
-
     return {
-      code: apiError.code ?? "REQUEST_FAILED",
-      message: apiError.message ?? fallbackMessage,
+      code: apiError.code ?? ERROR_CODE_FALLBACK,
+      message: apiError.message ?? message,
       status: apiError.status ?? error.response?.status,
       details: apiError.details,
     }
   }
 
   return {
-    code: "REQUEST_FAILED",
-    message: fallbackMessage,
+    code: ERROR_CODE_FALLBACK,
+    message,
     status: error.response?.status,
   }
 }
