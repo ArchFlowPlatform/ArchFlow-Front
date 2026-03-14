@@ -1,5 +1,5 @@
-import { HomePage } from "@/features/home/components/home-page"
+import ArchFlowLanding from "@/views/ArchFlowLanding/ArchFlowLanding";
 
-export default function Page() {
-  return <HomePage />
+export default function HomePage() {
+  return <ArchFlowLanding />;
 }

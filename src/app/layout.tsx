@@ -1,30 +1,33 @@
-import { Geist_Mono, Inter } from "next/font/google"
+import type { Metadata } from "next";
 
-import "./globals.css"
-import { ThemeProvider } from "@/components/providers/theme-provider"
-import { cn } from "@/lib/utils"
+import GlobalLoadingOverlay from "@/components/ui/GlobalLoadingOverlay";
+import "@/app/globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
+export const metadata: Metadata = {
+  title: "ArchFlow",
+  description: "ArchFlow - Architecture-driven project management",
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
-    >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+    <html lang="en">
+      <head>
+        <link rel="icon" href="/archflow-logo.png" type="image/png" />
+      </head>
+      <body
+        className="min-h-screen bg-[#16171d] text-white antialiased"
+        style={{
+          fontFamily:
+            'Satoshi, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, monospace',
+        }}
+      >
+        {children}
+        <GlobalLoadingOverlay />
       </body>
     </html>
-  )
+  );
 }
