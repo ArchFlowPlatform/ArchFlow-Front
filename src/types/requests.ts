@@ -198,6 +198,10 @@ export interface ReorderTasksRequest {
   taskIds: number[];
 }
 
+export interface ReorderTaskRequest {
+  position: number;
+}
+
 export interface MoveTaskRequest {
   taskId: number;
   targetSprintItemId: number;
@@ -214,6 +218,12 @@ export interface CreateLabelRequest {
 export interface UpdateLabelRequest {
   name?: string;
   color?: string;
+}
+
+// ----- Card labels (add to card) -----
+
+export interface AddLabelToCardRequest {
+  labelId: number;
 }
 
 // ----- Card comments -----

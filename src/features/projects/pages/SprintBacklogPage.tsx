@@ -7,22 +7,17 @@ import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import StorySprintCard from "@/components/sprint-backlog/StorySprintCard";
 import WorkloadPanel from "@/components/sprint-backlog/WorkloadPanel";
-import {
-  currentUserProfile,
-  mockProjects,
-  type Project,
-} from "../mocks/projects.mock";
-import {
-  buildSprintBacklogView,
-  type AssigneeWorkloadView,
-  type StoryTaskRowView,
+import { currentUserProfile } from "@/mocks/users.mock";
+import { useProject } from "../hooks/useProject";
+import { useSprintBacklogView } from "../hooks/useSprintBacklogView";
+import type {
+  AssigneeWorkloadView,
+  StoryTaskRowView,
 } from "../mocks/sprintBacklog.mock";
 
 interface SprintBacklogPageProps {
   projectId?: string;
 }
-
-const fallbackProject: Project = mockProjects[1] ?? mockProjects[0];
 
 function formatDate(dateISO: string): string {
   const date = new Date(dateISO);
@@ -47,22 +42,28 @@ export default function SprintBacklogPage({
 }: SprintBacklogPageProps) {
   const [query, setQuery] = useState("");
 
-  let projectFromParam: Project | undefined;
-  if (projectId) {
-    projectFromParam = mockProjects.find((project) => project.id === projectId);
-  }
+  const effectiveProjectId = projectId ?? "";
+  const { project } = useProject(effectiveProjectId || null);
+  const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
+    effectiveProjectId || ""
+  );
+  const { view, loading, error } = useSprintBacklogView(
+    effectiveProjectId || null,
+    selectedSprintId,
+    selectedSprint
+  );
 
-  const currentProject: Project = projectFromParam ?? fallbackProject;
-  const effectiveProjectId = projectId ?? currentProject.id;
-  const { sprints, selectedSprintId } = useProjectSprint(effectiveProjectId);
+  const projectName = project?.name ?? "…";
+  const projectOwner = project?.owner ?? currentUserProfile;
+  const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   if (!sprints.length || !selectedSprintId) {
     return (
       <ProjectShell
         projectId={effectiveProjectId}
-        projectName={currentProject.name}
-        projectOwner={currentProject.owner}
-        projectBadgeLabel={String(currentProject.members.length)}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint-backlog"
         pageTitle="Sprint Backlog"
         pageSubtitle="This project does not have any sprints yet."
@@ -78,43 +79,82 @@ export default function SprintBacklogPage({
     );
   }
 
-  const sprintBacklogView = buildSprintBacklogView(
-    effectiveProjectId,
-    selectedSprintId ?? undefined,
-  );
-  const {
-    sprint,
-    stories,
-  } = sprintBacklogView;
+  if (loading && !view) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="sprint-backlog"
+        pageTitle="Sprint Backlog"
+        pageSubtitle="Loading sprint items…"
+        currentUser={currentUserProfile}
+        mainColumn={
+          <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
+            <p className="af-text-secondary text-sm">Carregando…</p>
+          </div>
+        }
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="sprint-backlog"
+        pageTitle="Sprint Backlog"
+        pageSubtitle="Unable to load sprint backlog."
+        currentUser={currentUserProfile}
+        mainColumn={
+          <ProjectEmptyState
+            title="Failed to load sprint backlog."
+            description={error.message}
+            actionLabel="Try again"
+          />
+        }
+      />
+    );
+  }
+
+  const sprint = view!.sprint;
+  const stories = view!.stories;
   const periodLabel = buildPeriodLabel(sprint.startDate, sprint.endDate);
   const normalizedQuery = query.trim().toLowerCase();
+
   const filteredStories = useMemo(
     () =>
-      stories.filter((story) =>
-        !normalizedQuery ||
-        [
-          story.title,
-          story.description,
-          story.acceptanceCriteria,
-          story.epicName,
-          story.assignee.name,
-          ...story.tasks.flatMap((task) => [
-            task.title,
-            task.description,
-            task.assignee.name,
-          ]),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery),
+      stories.filter(
+        (story) =>
+          !normalizedQuery ||
+          [
+            story.title,
+            story.description,
+            story.acceptanceCriteria,
+            story.epicName,
+            story.assignee.name,
+            ...story.tasks.flatMap((task) => [
+              task.title,
+              task.description,
+              task.assignee.name,
+            ]),
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedQuery)
       ),
-    [normalizedQuery, stories],
+    [normalizedQuery, stories]
   );
+
   const filteredAssignees = useMemo(() => {
     const allTasks = filteredStories.flatMap((story) => story.tasks);
     const totalEstimatedHours = allTasks.reduce(
       (sum, task) => sum + task.estimatedHours,
-      0,
+      0
     );
 
     return Array.from(
@@ -137,15 +177,18 @@ export default function SprintBacklogPage({
             storyIds: Set<string>;
             tasks: StoryTaskRowView[];
           }
-        >(),
-      ),
+        >()
+      )
     )
       .map(([assigneeId, entry]) => {
         const estimatedHours = entry.tasks.reduce(
           (sum, task) => sum + task.estimatedHours,
-          0,
+          0
         );
-        const doneHours = entry.tasks.reduce((sum, task) => sum + task.doneHours, 0);
+        const doneHours = entry.tasks.reduce(
+          (sum, task) => sum + task.doneHours,
+          0
+        );
         const remainingHours = Math.max(estimatedHours - doneHours, 0);
         const averageTaskHours = entry.tasks.length
           ? Math.round((estimatedHours / entry.tasks.length) * 10) / 10
@@ -170,7 +213,10 @@ export default function SprintBacklogPage({
           loadLabel: formatLoadLabel(sprintWeightRatio),
           progressRatio,
           sprintWeightRatio,
-          statusChips: [doneHours <= estimatedHours ? "OK" : "Risco", "assignee"],
+          statusChips: [
+            doneHours <= estimatedHours ? "OK" : "Risco",
+            "assignee",
+          ],
           topTasks,
         } satisfies AssigneeWorkloadView;
       })
@@ -182,38 +228,39 @@ export default function SprintBacklogPage({
             [task.title, task.assignee.name]
               .join(" ")
               .toLowerCase()
-              .includes(normalizedQuery),
-          ),
+              .includes(normalizedQuery)
+          )
       )
       .sort((left, right) => right.estimatedHours - left.estimatedHours);
   }, [filteredStories, normalizedQuery]);
+
   const filteredTaskCount = filteredStories.reduce(
     (sum, story) => sum + story.tasks.length,
-    0,
+    0
   );
   const filteredEstimatedHours = filteredStories.reduce(
     (sum, story) =>
       sum +
       story.tasks.reduce((taskSum, task) => taskSum + task.estimatedHours, 0),
-    0,
+    0
   );
   const filteredDoneHours = filteredStories.reduce(
     (sum, story) =>
       sum +
       story.tasks.reduce((taskSum, task) => taskSum + task.doneHours, 0),
-    0,
+    0
   );
   const filteredRemainingHours = Math.max(
     filteredEstimatedHours - filteredDoneHours,
-    0,
+    0
   );
 
   return (
     <ProjectShell
       projectId={effectiveProjectId}
-      projectName={currentProject.name}
-      projectOwner={currentProject.owner}
-      projectBadgeLabel={String(currentProject.members.length)}
+      projectName={projectName}
+      projectOwner={projectOwner}
+      projectBadgeLabel={projectBadgeLabel}
       activeNavItem="sprint-backlog"
       pageTitle="Sprint Backlog"
       pageSubtitle="Stories planejadas para entrega nesta sprint, com tarefas e distribuição por responsável."
@@ -257,16 +304,18 @@ export default function SprintBacklogPage({
           </section>
         )
       }
-      sideColumn={stories.length === 0 ? undefined : (
-        <WorkloadPanel
-          assignees={filteredAssignees}
-          storyCount={filteredStories.length}
-          taskCount={filteredTaskCount}
-          estimatedHours={filteredEstimatedHours}
-          doneHours={filteredDoneHours}
-          remainingHours={filteredRemainingHours}
-        />
-      )}
+      sideColumn={
+        stories.length === 0 ? undefined : (
+          <WorkloadPanel
+            assignees={filteredAssignees}
+            storyCount={filteredStories.length}
+            taskCount={filteredTaskCount}
+            estimatedHours={filteredEstimatedHours}
+            doneHours={filteredDoneHours}
+            remainingHours={filteredRemainingHours}
+          />
+        )
+      }
     />
   );
 }

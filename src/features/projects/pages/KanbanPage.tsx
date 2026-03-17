@@ -8,53 +8,58 @@ import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import KanbanColumn from "@/components/kanban/KanbanColumn";
 import KanbanModal from "@/components/kanban/KanbanModal";
+import { currentUserProfile } from "@/mocks/users.mock";
+import { useProject } from "../hooks/useProject";
+import { useKanbanBoardView } from "../hooks/useKanbanBoardView";
 import {
-  currentUserProfile,
-  mockProjects,
-  type Project,
-} from "../mocks/projects.mock";
-import {
-  buildInitialKanbanCardState,
-  buildKanbanBoardView,
   buildKanbanColumns,
-  getColumnConfig,
   getColumnUsageHours,
   getCardById,
   type KanbanBoardCardState,
   type KanbanColumnId,
+  type KanbanColumnView,
 } from "../mocks/kanban.mock";
 
 interface KanbanPageProps {
   projectId?: string;
 }
 
-const fallbackProject: Project = mockProjects[1] ?? mockProjects[0];
+function getColumnConfigFromView(
+  columns: KanbanColumnView[],
+  columnId: KanbanColumnId
+): KanbanColumnView | undefined {
+  return columns.find((c) => c.id === columnId);
+}
 
 export default function KanbanPage({ projectId }: KanbanPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{
-    title: string;
-    body: string;
-  } | null>(null);
+  const [toast, setToast] = useState<{ title: string; body: string } | null>(null);
+  const [cardState, setCardState] = useState<KanbanBoardCardState[]>([]);
 
-  let projectFromParam: Project | undefined;
-  if (projectId) {
-    projectFromParam = mockProjects.find((project) => project.id === projectId);
-  }
+  const effectiveProjectId = projectId ?? "";
+  const { project } = useProject(effectiveProjectId || null);
+  const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
+    effectiveProjectId || ""
+  );
+  const { view, loading, error, refetch } = useKanbanBoardView(
+    effectiveProjectId || null,
+    selectedSprintId,
+    selectedSprint
+  );
 
-  const currentProject: Project = projectFromParam ?? fallbackProject;
-  const effectiveProjectId = projectId ?? currentProject.id;
-  const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(effectiveProjectId);
+  const projectName = project?.name ?? "…";
+  const projectOwner = project?.owner ?? currentUserProfile;
+  const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   if (!sprints.length || !selectedSprintId) {
     return (
       <ProjectShell
         projectId={effectiveProjectId}
-        projectName={currentProject.name}
-        projectOwner={currentProject.owner}
-        projectBadgeLabel={String(currentProject.members.length)}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
         activeNavItem="kanban"
         pageTitle="Kanban"
         pageSubtitle="This project does not have any sprints yet."
@@ -71,10 +76,51 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
     );
   }
 
-  const baseBoard = useMemo(
-    () => buildKanbanBoardView(effectiveProjectId, selectedSprintId ?? undefined),
-    [effectiveProjectId, selectedSprintId],
-  );
+  if (loading && !view) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="kanban"
+        pageTitle="Kanban"
+        pageSubtitle="Loading board…"
+        currentUser={currentUserProfile}
+        fullWidthMain
+        mainColumn={
+          <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
+            <p className="af-text-secondary text-sm">Carregando…</p>
+          </div>
+        }
+      />
+    );
+  }
+
+  if (error || !view) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="kanban"
+        pageTitle="Kanban"
+        pageSubtitle="Unable to load board."
+        currentUser={currentUserProfile}
+        fullWidthMain
+        mainColumn={
+          <ProjectEmptyState
+            title="Failed to load board."
+            description={error?.message ?? "Unknown error"}
+            actionLabel="Retry"
+          />
+        }
+      />
+    );
+  }
+
+  const baseBoard = view;
   const columnMeta = useMemo(
     () =>
       baseBoard.columns.map(({ id, title, wipLimitHours, helpText }) => ({
@@ -83,133 +129,140 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
         wipLimitHours,
         helpText,
       })),
-    [baseBoard.columns],
+    [baseBoard.columns]
   );
-  const [cardState, setCardState] = useState<KanbanBoardCardState[]>(
-    () => buildInitialKanbanCardState(baseBoard.allCards),
-  );
+
   const boardCards = useMemo(
     () =>
       baseBoard.allCards.map((card) => {
         const state = cardState.find((entry) => entry.id === card.id);
-
         return {
           ...card,
           kanbanStatus: state?.kanbanStatus ?? card.kanbanStatus,
           position: state?.position ?? card.position,
         };
       }),
-    [baseBoard.allCards, cardState],
+    [baseBoard.allCards, cardState]
   );
+
   const filteredCards = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return boardCards.filter(
-      (card) => !query || card.searchText.includes(query),
+      (card) => !query || card.searchText.includes(query)
     );
   }, [boardCards, searchTerm]);
+
   const filteredColumns = useMemo(
     () => buildKanbanColumns(filteredCards, columnMeta),
-    [columnMeta, filteredCards],
+    [columnMeta, filteredCards]
   );
+
   const selectedCard = getCardById(
     {
       ...baseBoard,
       allCards: boardCards,
       columns: buildKanbanColumns(boardCards, columnMeta),
     },
-    selectedCardId,
+    selectedCardId
   );
 
   useEffect(() => {
-    setCardState(buildInitialKanbanCardState(baseBoard.allCards));
+    setCardState(
+      baseBoard.allCards.map((card) => ({
+        id: card.id,
+        kanbanStatus: card.kanbanStatus,
+        position: card.position,
+      }))
+    );
     setSelectedCardId(null);
     setDraggingCardId(null);
   }, [baseBoard.allCards]);
 
   useEffect(() => {
-    if (!toast) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setToast(null);
-    }, 4200);
-
+    if (!toast) return;
+    const timeoutId = window.setTimeout(() => setToast(null), 4200);
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
-  function handleDropCard(cardId: string, targetColumnId: KanbanColumnId) {
-    setCardState((currentState) => {
-      const movingState = currentState.find((entry) => entry.id === cardId);
-      if (!movingState) {
-        return currentState;
-      }
+  async function handleDropCard(cardId: string, targetColumnId: KanbanColumnId) {
+    const movingCard = boardCards.find((card) => card.id === cardId);
+    if (!movingCard) {
+      setDraggingCardId(null);
+      return;
+    }
 
-      if (movingState.kanbanStatus === targetColumnId) {
-        return currentState;
-      }
+    if (movingCard.kanbanStatus === targetColumnId) {
+      setDraggingCardId(null);
+      return;
+    }
 
-      const movingCard = boardCards.find((card) => card.id === cardId);
-      if (!movingCard) {
-        return currentState;
-      }
+    const targetColumn = getColumnConfigFromView(
+      baseBoard.columns,
+      targetColumnId
+    );
+    const targetCards = boardCards.filter(
+      (card) => card.id !== cardId && card.kanbanStatus === targetColumnId
+    );
+    const currentHours = getColumnUsageHours(targetCards);
+    const nextHours = currentHours + movingCard.estimatedHours;
 
-      const targetColumnConfig = getColumnConfig(targetColumnId, effectiveProjectId);
-      const targetCards = boardCards.filter(
-        (card) =>
-          card.id !== cardId && card.kanbanStatus === targetColumnId,
+    if (
+      targetColumn &&
+      targetColumn.wipLimitHours !== null &&
+      nextHours > targetColumn.wipLimitHours
+    ) {
+      setToast({
+        title: "WIP limit exceeded",
+        body: `This column is limited to ${targetColumn.wipLimitHours}h. Moving this item would increase WIP to ${nextHours}h. Reduce work in progress or move it to another column.`,
+      });
+      setDraggingCardId(null);
+      return;
+    }
+
+    const sourceColumn = baseBoard.columns.find(
+      (c) => c.id === movingCard.kanbanStatus
+    );
+    const targetBackendColumnId = targetColumn?.backendColumnId;
+    const sourceBackendColumnId = sourceColumn?.backendColumnId;
+
+    if (
+      !effectiveProjectId ||
+      !selectedSprintId ||
+      sourceBackendColumnId == null ||
+      targetBackendColumnId == null
+    ) {
+      setDraggingCardId(null);
+      return;
+    }
+
+    try {
+      const { moveCard } = await import(
+        "@/features/board/api/board-cards.api"
       );
-      const currentHours = getColumnUsageHours(targetCards);
-      const nextHours = currentHours + movingCard.estimatedHours;
-
-      if (
-        targetColumnConfig.wipLimitHours !== null &&
-        nextHours > targetColumnConfig.wipLimitHours
-      ) {
-        setToast({
-          title: "WIP limit exceeded",
-          body: `This column is limited to ${targetColumnConfig.wipLimitHours}h. Moving this item would increase WIP to ${nextHours}h. Reduce work in progress or move it to another column.`,
-        });
-        return currentState;
-      }
-
-      const reorderedState = currentState
-        .filter((entry) => entry.id !== cardId)
-        .map((entry) => ({ ...entry }));
-      const nextPosition = reorderedState.filter(
-        (entry) => entry.kanbanStatus === targetColumnId,
-      ).length;
-
-      reorderedState.push({
-        id: cardId,
-        kanbanStatus: targetColumnId,
-        position: nextPosition,
+      await moveCard(
+        effectiveProjectId,
+        selectedSprintId,
+        sourceBackendColumnId,
+        Number(cardId),
+        { targetColumnId: targetBackendColumnId }
+      );
+      await refetch();
+    } catch {
+      setToast({
+        title: "Failed to move card",
+        body: "Could not update the card position. Please try again.",
       });
-
-      return reorderedState.map((entry) => {
-        const columnEntries = reorderedState
-          .filter((candidate) => candidate.kanbanStatus === entry.kanbanStatus)
-          .sort((left, right) => left.position - right.position);
-        const normalizedPosition = columnEntries.findIndex(
-          (candidate) => candidate.id === entry.id,
-        );
-
-        return {
-          ...entry,
-          position: normalizedPosition,
-        };
-      });
-    });
-
-    setDraggingCardId(null);
+    } finally {
+      setDraggingCardId(null);
+    }
   }
 
   return (
     <ProjectShell
       projectId={effectiveProjectId}
-      projectName={currentProject.name}
-      projectOwner={currentProject.owner}
-      projectBadgeLabel={String(currentProject.members.length)}
+      projectName={projectName}
+      projectOwner={projectOwner}
+      projectBadgeLabel={projectBadgeLabel}
       activeNavItem="kanban"
       pageTitle="Kanban"
       pageSubtitle="Fluxo visual das user stories em andamento no sprint."
@@ -218,7 +271,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       showSearch
       searchPlaceholder="Buscar por epic, story, tarefa..."
       searchValue={searchTerm}
-      onSearchChange={setSearchTerm}
+      onSearchChange={(v) => setSearchTerm(v)}
       fullWidthMain
       mainColumn={
         baseBoard.allCards.length === 0 ? (
@@ -232,7 +285,9 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
             {toast ? (
               <div className="pointer-events-none fixed right-5 top-5 z-40 w-full max-w-sm">
                 <div className="af-surface-lg af-accent-panel bg-[#14121a]/95 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
-                  <p className="text-sm font-semibold text-white">{toast.title}</p>
+                  <p className="text-sm font-semibold text-white">
+                    {toast.title}
+                  </p>
                   <p className="af-text-secondary mt-1 text-xs leading-relaxed">
                     {toast.body}
                   </p>
@@ -261,7 +316,10 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
                         type="button"
                         className="af-focus-ring af-accent-hover af-text-secondary inline-flex w-full items-center gap-2 px-2 py-2 text-sm transition hover:bg-white/[0.03] hover:text-[var(--accent-soft-35)]"
                       >
-                        <Plus className="af-accent-icon h-4 w-4" aria-hidden="true" />
+                        <Plus
+                          className="af-accent-icon h-4 w-4"
+                          aria-hidden="true"
+                        />
                         <span>Adicionar outra coluna</span>
                       </button>
                     </div>
@@ -270,7 +328,11 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
               </div>
             </section>
 
-            <KanbanModal card={selectedCard} onClose={() => setSelectedCardId(null)} />
+            <KanbanModal
+              projectId={effectiveProjectId}
+              card={selectedCard}
+              onClose={() => setSelectedCardId(null)}
+            />
           </>
         )
       }

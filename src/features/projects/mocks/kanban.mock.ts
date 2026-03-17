@@ -25,7 +25,7 @@ import type {
 import type { User } from "@/types/user";
 
 export type UserStoryPriority = "P1" | "P2" | "P3";
-export type KanbanColumnId = "todo" | "doing" | "review" | "done";
+export type KanbanColumnId = "todo" | "doing" | "review" | "done" | (string & {});
 
 export interface KanbanSprint {
   id: string;
@@ -92,6 +92,8 @@ export interface KanbanCardView {
 
 export interface KanbanColumnView {
   id: KanbanColumnId;
+  /** Backend column id for API calls (moveCard, etc.). Set when using real API. */
+  backendColumnId?: number;
   title: string;
   wipLabel: string;
   wipLimitHours: number | null;

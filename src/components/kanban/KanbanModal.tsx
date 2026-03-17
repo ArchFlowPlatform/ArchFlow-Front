@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
@@ -6,16 +8,112 @@ import {
   formatKanbanStoryStatus,
   getCardSystemBadges,
 } from "@/features/projects/mocks/kanban.mock";
+import { useCardComments } from "@/features/card-comments/hooks/useCardComments";
+import { useCardLabels } from "@/features/card-labels/hooks/useCardLabels";
+import { useCardAttachments } from "@/features/card-attachments/hooks/useCardAttachments";
+import { useCardActivities } from "@/features/card-activities/hooks/useCardActivities";
+import { createComment } from "@/features/card-comments/api/card-comments.api";
+import { useProject } from "@/features/projects/hooks/useProject";
+import type { User } from "@/types/user";
 import UserAvatar from "../ui/UserAvatar";
 import SystemBadge from "./SystemBadge";
 import UserLabelBadge from "./UserLabelBadge";
 
-interface KanbanModalProps {
-  card: KanbanCardView | null;
-  onClose: () => void;
+function formatDateTime(dateISO: string): string {
+  return new Date(dateISO).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-export default function KanbanModal({ card, onClose }: KanbanModalProps) {
+function resolveUser(
+  userId: string,
+  members: { user?: User }[]
+): User {
+  const m = members.find((x) => x.user?.id === userId);
+  if (m?.user) return m.user;
+  return {
+    id: userId,
+    name: "—",
+    email: "",
+    type: "",
+    avatarUrl: "",
+    createdAt: "",
+    updatedAt: "",
+  } as User;
+}
+
+interface KanbanModalProps {
+  projectId?: string;
+  card: KanbanCardView | null;
+  onClose: () => void;
+  onRefetch?: () => void;
+}
+
+export default function KanbanModal({
+  projectId,
+  card,
+  onClose,
+  onRefetch,
+}: KanbanModalProps) {
+  const cardId = card ? Number(card.id) : null;
+  const { project } = useProject(projectId || null);
+  const members = project?.members ?? [];
+
+  const { comments: apiComments, loading: commentsLoading, refetch: refetchComments } = useCardComments(
+    projectId || null,
+    cardId
+  );
+  const { cardLabels: apiCardLabels, loading: labelsLoading } = useCardLabels(
+    projectId || null,
+    cardId
+  );
+  const { attachments: apiAttachments, loading: attachmentsLoading } = useCardAttachments(
+    projectId || null,
+    cardId
+  );
+  const { activities: apiActivities } = useCardActivities(
+    projectId || null,
+    cardId
+  );
+
+  const [newCommentContent, setNewCommentContent] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+
+  const displayUserLabels = apiCardLabels.length > 0
+    ? apiCardLabels.map((cl) => ({
+        id: String(cl.id),
+        name: cl.label?.name ?? "—",
+        color: cl.label?.color ?? "#666",
+      }))
+    : card?.userLabels ?? [];
+
+  const displayComments = apiComments.map((c) => ({
+    id: String(c.id),
+    author: resolveUser(c.userId, members),
+    body: c.content,
+    type: (c.parentCommentId != null ? "note" : "comment") as "comment" | "note",
+    createdAt: c.createdAt,
+    createdAtLabel: formatDateTime(c.createdAt),
+  }));
+
+  const handleAddComment = useCallback(async () => {
+    if (!projectId || cardId == null || !newCommentContent.trim()) return;
+    setCommentSubmitting(true);
+    try {
+      await createComment(projectId, cardId, { content: newCommentContent.trim() });
+      setNewCommentContent("");
+      await refetchComments();
+      onRefetch?.();
+    } catch {
+      // Could show toast
+    } finally {
+      setCommentSubmitting(false);
+    }
+  }, [projectId, cardId, newCommentContent, refetchComments, onRefetch]);
   useEffect(() => {
     if (!card) {
       return;
@@ -53,9 +151,9 @@ export default function KanbanModal({ card, onClose }: KanbanModalProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-3">
                   <h2 className="text-lg font-semibold text-white">{card.title}</h2>
-                  {card.userLabels.length ? (
+                  {displayUserLabels.length ? (
                     <div className="flex flex-wrap gap-1.5">
-                      {card.userLabels.map((label) => (
+                      {displayUserLabels.map((label) => (
                         <UserLabelBadge
                           key={label.id}
                           name={label.name}
@@ -96,9 +194,9 @@ export default function KanbanModal({ card, onClose }: KanbanModalProps) {
                 </p>
                 <div className="af-surface-md bg-white/[0.03] px-3 py-3">
                   <div className="space-y-2">
-                    {card.userLabels.length ? (
+                    {displayUserLabels.length ? (
                       <div className="flex flex-wrap gap-1.5">
-                        {card.userLabels.map((label) => (
+                        {displayUserLabels.map((label) => (
                           <UserLabelBadge
                             key={label.id}
                             name={label.name}
@@ -245,13 +343,13 @@ export default function KanbanModal({ card, onClose }: KanbanModalProps) {
                       </p>
                     </div>
                     <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/72">
-                      {card.comments.length}
+                      {displayComments.length}
                     </span>
                   </div>
                 </header>
 
                 <div className="mt-3 space-y-2.5">
-                  {card.comments.map((comment) => (
+                  {displayComments.map((comment) => (
                     <article
                       key={comment.id}
                       className="af-surface-md bg-white/[0.03] px-3 py-3"
@@ -279,8 +377,57 @@ export default function KanbanModal({ card, onClose }: KanbanModalProps) {
                       </p>
                     </article>
                   ))}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAddComment();
+                    }}
+                    className="mt-3 space-y-2"
+                  >
+                    <textarea
+                      value={newCommentContent}
+                      onChange={(e) => setNewCommentContent(e.target.value)}
+                      placeholder="Adicionar comentário..."
+                      rows={2}
+                      className="af-surface-md w-full resize-y rounded border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/40 focus:border-white/20 focus:outline-none"
+                      disabled={commentSubmitting}
+                    />
+                    <button
+                      type="submit"
+                      disabled={commentSubmitting || !newCommentContent.trim()}
+                      className="af-focus-ring af-accent-hover inline-flex h-8 items-center px-3 text-sm text-white/80 disabled:opacity-50"
+                    >
+                      {commentSubmitting ? "Enviando…" : "Enviar"}
+                    </button>
+                  </form>
                 </div>
               </section>
+
+              {apiAttachments.length > 0 ? (
+                <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
+                  <header className="af-separator-b pb-3">
+                    <h3 className="text-sm font-semibold text-white">Anexos</h3>
+                  </header>
+                  <ul className="af-text-secondary mt-3 space-y-1.5 text-xs">
+                    {apiAttachments.map((a) => (
+                      <li key={a.id}>{a.fileName}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {apiActivities.length > 0 ? (
+                <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
+                  <header className="af-separator-b pb-3">
+                    <h3 className="text-sm font-semibold text-white">Atividade</h3>
+                  </header>
+                  <ul className="af-text-secondary mt-3 space-y-1.5 text-xs">
+                    {apiActivities.slice(0, 10).map((a) => (
+                      <li key={a.id}>{a.description || a.activityType}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
             </div>
           </aside>
         </div>
