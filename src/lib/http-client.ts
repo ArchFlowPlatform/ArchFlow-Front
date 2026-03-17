@@ -5,7 +5,7 @@ import { getToken, clearToken } from "@/lib/auth-token";
 const DEFAULT_BASE_URL =
   typeof window !== "undefined"
     ? (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api")
-    : process.env.API_BASE_URL ?? "http://localhost:3000/api";
+    : process.env.API_BASE_URL ?? "http://localhost:5064/api";
 
 const SIGN_IN_PATH = "/signin";
 
