@@ -69,10 +69,10 @@ export default function ProjectSidebar({
   const [isScrumExpanded, setIsScrumExpanded] = useState(isScrumActive);
 
   useEffect(() => {
-    if (isScrumActive) {
+    if (isScrumActive && !isScrumExpanded) {
       setIsScrumExpanded(true);
     }
-  }, [isScrumActive]);
+  }, [isScrumActive, isScrumExpanded]);
 
   function handleNavigation(
     event: MouseEvent<HTMLAnchorElement>,

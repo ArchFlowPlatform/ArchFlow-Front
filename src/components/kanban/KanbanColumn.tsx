@@ -51,13 +51,13 @@ export default function KanbanColumn({
             <p className="af-text-tertiary mt-1 text-[11px]">{column.wipLabel}</p>
           </div>
 
-          <SystemBadge>{String(column.cards.length)}</SystemBadge>
+          <SystemBadge>{String((column.cards ?? []).length)}</SystemBadge>
         </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
         <div className="space-y-2.5">
-          {column.cards.map((card) => (
+          {(column.cards ?? []).map((card) => (
             <KanbanCard
               key={card.id}
               card={card}
@@ -68,7 +68,7 @@ export default function KanbanColumn({
             />
           ))}
 
-          {!column.cards.length ? (
+          {!(column.cards ?? []).length ? (
             <div className="af-surface-md af-text-tertiary bg-black/10 px-3 py-6 text-center text-[11px]">
               Arraste um card para cá
             </div>

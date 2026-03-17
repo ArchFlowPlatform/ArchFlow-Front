@@ -19,9 +19,9 @@ export default function KanbanCard({
   onDragStart,
   onDragEnd,
 }: KanbanCardProps) {
-  const systemBadges = getInlineCardSystemBadges(card);
+  const systemBadges = getInlineCardSystemBadges(card) ?? [];
   const footerBadges = [
-    ...card.userLabels.map((label) => ({
+    ...(card.userLabels ?? []).map((label) => ({
       key: label.id,
       kind: "user" as const,
       label,

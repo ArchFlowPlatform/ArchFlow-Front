@@ -7,7 +7,8 @@ import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import StorySprintCard from "@/components/sprint-backlog/StorySprintCard";
 import WorkloadPanel from "@/components/sprint-backlog/WorkloadPanel";
-import { currentUserProfile } from "@/mocks/users.mock";
+import { authUserToUser } from "@/features/auth/types/auth.types";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { useProject } from "../hooks/useProject";
 import { useSprintBacklogView } from "../hooks/useSprintBacklogView";
 import type {
@@ -43,6 +44,7 @@ export default function SprintBacklogPage({
   const [query, setQuery] = useState("");
 
   const effectiveProjectId = projectId ?? "";
+  const { user } = useAuth();
   const { project } = useProject(effectiveProjectId || null);
   const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
     effectiveProjectId || ""
@@ -53,77 +55,14 @@ export default function SprintBacklogPage({
     selectedSprint
   );
 
+  const placeholderUser = authUserToUser(user) ?? { id: "", name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" };
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? currentUserProfile;
+  const projectOwner = project?.owner ?? placeholderUser;
   const projectBadgeLabel = project ? String(project.members.length) : "0";
 
-  if (!sprints.length || !selectedSprintId) {
-    return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwner={projectOwner}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint-backlog"
-        pageTitle="Sprint Backlog"
-        pageSubtitle="This project does not have any sprints yet."
-        currentUser={currentUserProfile}
-        mainColumn={
-          <ProjectEmptyState
-            title="This project does not have any sprints yet."
-            description="Create a sprint before planning user stories and tasks for execution."
-            actionLabel="Create sprint"
-          />
-        }
-      />
-    );
-  }
-
-  if (loading && !view) {
-    return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwner={projectOwner}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint-backlog"
-        pageTitle="Sprint Backlog"
-        pageSubtitle="Loading sprint items…"
-        currentUser={currentUserProfile}
-        mainColumn={
-          <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
-            <p className="af-text-secondary text-sm">Carregando…</p>
-          </div>
-        }
-      />
-    );
-  }
-
-  if (error) {
-    return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwner={projectOwner}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint-backlog"
-        pageTitle="Sprint Backlog"
-        pageSubtitle="Unable to load sprint backlog."
-        currentUser={currentUserProfile}
-        mainColumn={
-          <ProjectEmptyState
-            title="Failed to load sprint backlog."
-            description={error.message}
-            actionLabel="Try again"
-          />
-        }
-      />
-    );
-  }
-
-  const sprint = view!.sprint;
-  const stories = view!.stories;
-  const periodLabel = buildPeriodLabel(sprint.startDate, sprint.endDate);
+  const stories = view?.stories ?? [];
+  const sprint = view?.sprint ?? null;
+  const periodLabel = sprint ? buildPeriodLabel(sprint.startDate, sprint.endDate) : "";
   const normalizedQuery = query.trim().toLowerCase();
 
   const filteredStories = useMemo(
@@ -137,7 +76,7 @@ export default function SprintBacklogPage({
             story.acceptanceCriteria,
             story.epicName,
             story.assignee.name,
-            ...story.tasks.flatMap((task) => [
+            ...(story.tasks ?? []).flatMap((task) => [
               task.title,
               task.description,
               task.assignee.name,
@@ -151,7 +90,7 @@ export default function SprintBacklogPage({
   );
 
   const filteredAssignees = useMemo(() => {
-    const allTasks = filteredStories.flatMap((story) => story.tasks);
+    const allTasks = filteredStories.flatMap((story) => story.tasks ?? []);
     const totalEstimatedHours = allTasks.reduce(
       (sum, task) => sum + task.estimatedHours,
       0
@@ -234,20 +173,84 @@ export default function SprintBacklogPage({
       .sort((left, right) => right.estimatedHours - left.estimatedHours);
   }, [filteredStories, normalizedQuery]);
 
+  if (!sprints.length || !selectedSprintId) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="sprint-backlog"
+        pageTitle="Sprint Backlog"
+        pageSubtitle="This project does not have any sprints yet."
+        currentUser={placeholderUser}
+        mainColumn={
+          <ProjectEmptyState
+            title="This project does not have any sprints yet."
+            description="Create a sprint before planning user stories and tasks for execution."
+            actionLabel="Create sprint"
+          />
+        }
+      />
+    );
+  }
+
+  if (loading && !view) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="sprint-backlog"
+        pageTitle="Sprint Backlog"
+        pageSubtitle="Loading sprint items…"
+        currentUser={placeholderUser}
+        mainColumn={
+          <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
+            <p className="af-text-secondary text-sm">Carregando…</p>
+          </div>
+        }
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwner={projectOwner}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="sprint-backlog"
+        pageTitle="Sprint Backlog"
+        pageSubtitle="Unable to load sprint backlog."
+        currentUser={placeholderUser}
+        mainColumn={
+          <ProjectEmptyState
+            title="Failed to load sprint backlog."
+            description={error.message}
+            actionLabel="Try again"
+          />
+        }
+      />
+    );
+  }
+
   const filteredTaskCount = filteredStories.reduce(
-    (sum, story) => sum + story.tasks.length,
+    (sum, story) => sum + (story.tasks ?? []).length,
     0
   );
   const filteredEstimatedHours = filteredStories.reduce(
     (sum, story) =>
       sum +
-      story.tasks.reduce((taskSum, task) => taskSum + task.estimatedHours, 0),
+      (story.tasks ?? []).reduce((taskSum, task) => taskSum + task.estimatedHours, 0),
     0
   );
   const filteredDoneHours = filteredStories.reduce(
     (sum, story) =>
       sum +
-      story.tasks.reduce((taskSum, task) => taskSum + task.doneHours, 0),
+      (story.tasks ?? []).reduce((taskSum, task) => taskSum + task.doneHours, 0),
     0
   );
   const filteredRemainingHours = Math.max(
@@ -265,7 +268,7 @@ export default function SprintBacklogPage({
       pageTitle="Sprint Backlog"
       pageSubtitle="Stories planejadas para entrega nesta sprint, com tarefas e distribuição por responsável."
       pageContextLabel={`${sprint.name} - itens planejados`}
-      currentUser={currentUserProfile}
+      currentUser={placeholderUser}
       showSearch
       searchPlaceholder="Buscar stories, tarefas ou responsáveis..."
       searchValue={query}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Sprint } from "@/types/sprint";
 import type { BoardColumn, BoardCard } from "@/types/board";
 import type { User } from "@/types/user";
@@ -123,7 +123,7 @@ export function useKanbanBoardView(
   const loading = colsLoading;
   const error = colsError;
 
-  const view: KanbanBoardViewModel | null = (() => {
+  const view = useMemo<KanbanBoardViewModel | null>(() => {
     if (!sprint || !projectId || !sprintId) return null;
     if (colsLoading || error) return null;
 
@@ -220,7 +220,17 @@ export function useKanbanBoardView(
       columns: columnViews,
       allCards,
     } as KanbanBoardViewModel;
-  })();
+  }, [
+    columns,
+    cardsByColumnId,
+    sprint,
+    colsLoading,
+    error,
+    epics,
+    members,
+    projectId,
+    sprintId,
+  ]);
 
   return { view, loading, error, refetch };
 }

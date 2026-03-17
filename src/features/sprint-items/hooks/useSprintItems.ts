@@ -30,7 +30,7 @@ export function useSprintItems(
     setError(null);
     try {
       const data = await getSprintItems(projectId, sprintId);
-      setItems(data);
+      setItems(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setItems([]);

@@ -25,7 +25,14 @@ export async function getBacklog(projectId: string): Promise<ProductBacklog> {
   if (!response.success || !response.data) {
     throw new Error(response.message ?? "Failed to fetch backlog");
   }
-  return response.data;
+  const data = response.data;
+  return {
+    ...data,
+    epics: (data.epics ?? []).map((epic) => ({
+      ...epic,
+      userStories: epic.userStories ?? [],
+    })),
+  };
 }
 
 export async function updateBacklogOverview(

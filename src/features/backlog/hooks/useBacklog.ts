@@ -27,7 +27,14 @@ export function useBacklog(projectId: string | null): UseBacklogResult {
     setError(null);
     try {
       const data = await getBacklog(projectId);
-      setBacklog(data);
+      const normalized: ProductBacklog = {
+        ...data,
+        epics: (data.epics ?? []).map((epic) => ({
+          ...epic,
+          userStories: epic.userStories ?? [],
+        })),
+      };
+      setBacklog(normalized);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setBacklog(null);

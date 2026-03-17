@@ -1,46 +1,48 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from "axios";
 import type { ApiResponse } from "@/types/api";
-import { getToken, clearToken } from "@/lib/auth-token";
 
 const DEFAULT_BASE_URL =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api")
-    : process.env.API_BASE_URL ?? "http://localhost:5064/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  process.env.API_BASE_URL ??
+  "http://localhost:5064/api";
 
 const SIGN_IN_PATH = "/signin";
 
+/** Public routes that must never trigger auth redirect (prevents redirect loop). */
+const PUBLIC_ROUTES = ["/signin", "/signup"];
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
 /**
  * HTTP client for API communication.
- * All API calls must go through services that use this client.
- * - Request: injects Authorization Bearer token when available.
- * - Response: on 401, clears token and redirects to sign-in.
+ * Authentication uses httpOnly cookies — no manual token handling.
+ * - Requests include cookies via withCredentials: true.
+ * - Response: on 401, redirects to sign-in (except on public routes to prevent loop).
+ *
+ * Backend must set Access-Control-Allow-Credentials: true for cookies to work.
  */
 function createHttpClient(): AxiosInstance {
   const client = axios.create({
     baseURL: DEFAULT_BASE_URL,
     timeout: 30_000,
+    withCredentials: true,
     headers: {
       "Content-Type": "application/json",
     },
   });
 
-  client.interceptors.request.use(
-    (config) => {
-      const token = getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    },
-    (error) => Promise.reject(error)
-  );
-
   client.interceptors.response.use(
     (response) => response,
     (error) => {
       if (error.response?.status === 401 && typeof window !== "undefined") {
-        clearToken();
-        window.location.href = SIGN_IN_PATH;
+        const pathname = window.location.pathname;
+        if (!isPublicRoute(pathname)) {
+          window.location.href = SIGN_IN_PATH;
+        }
       }
       return Promise.reject(error);
     }

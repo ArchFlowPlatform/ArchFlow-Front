@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getToken } from "@/lib/auth-token";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import { me as fetchMe } from "../api/auth.api";
 import type { AuthUser } from "../types/auth.types";
 
@@ -27,6 +27,11 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Auth state is derived from GET /auth/me.
+ * With httpOnly cookies, the browser sends the cookie automatically.
+ * No client-side token access.
+ */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,11 +41,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const refetchUser = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setUserState(null);
-      return;
-    }
     try {
       const response = await fetchMe();
       if (response.success && response.data) {
@@ -54,12 +54,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      setUserState(null);
-      setIsLoading(false);
-      return;
-    }
     let cancelled = false;
     fetchMe()
       .then((response) => {
@@ -91,6 +85,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }),
     [user, isLoading, setUser, refetchUser]
   );
+
+  if (isLoading) {
+    return (
+      <AuthContext.Provider value={value}>
+        <LoadingScreen isVisible />
+        <span className="sr-only">Loading authentication…</span>
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

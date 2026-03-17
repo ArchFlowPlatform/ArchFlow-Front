@@ -1,4 +1,4 @@
-import type { Sprint } from "@/features/projects/mocks/sprint.mock";
+import type { Sprint } from "@/types/sprint";
 
 interface SprintSummaryCardProps {
   sprint: Sprint;

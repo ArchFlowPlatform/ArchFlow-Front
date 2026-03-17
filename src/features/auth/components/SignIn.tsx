@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
@@ -12,6 +12,8 @@ import {
   startTimedGlobalLoading,
 } from "@/hooks/useGlobalLoading";
 import { useAppNavigate } from "@/hooks/useAppNavigate";
+import { login } from "../api/auth.api";
+import { useAuth } from "../context/AuthContext";
 import AuthLayout from "./AuthLayout";
 
 const primaryButtonClassName =
@@ -32,6 +34,9 @@ function Divider() {
 
 export default function SignIn() {
   const { navigate } = useAppNavigate();
+  const { setUser, refetchUser } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleOAuth = (provider: OAuthProvider) => {
     console.log(`oauth: ${provider}`);
@@ -39,18 +44,33 @@ export default function SignIn() {
     navigate("/projects", { withLoading: false });
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
 
-    console.log("auth: signin", {
-      email: formData.get("email"),
-      password: formData.get("password"),
-    });
-
-    startTimedGlobalLoading("auth", DEFAULT_LOADING_DURATION_MS + 180);
-    navigate("/projects", { withLoading: false });
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const response = await login({ email, password });
+      if (response.success) {
+        // Backend sets httpOnly cookie; use user from response or refetch from /me
+        if (response.data?.user) {
+          setUser(response.data.user);
+        } else {
+          await refetchUser();
+        }
+        startTimedGlobalLoading("auth", DEFAULT_LOADING_DURATION_MS + 180);
+        navigate("/projects", { withLoading: false });
+      } else {
+        setError(response.message ?? "Falha no login. Verifique suas credenciais.");
+      }
+    } catch {
+      setError("Erro ao conectar. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -65,6 +85,11 @@ export default function SignIn() {
           <Divider />
 
           <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
+            {error ? (
+              <p className="rounded-md bg-red-500/10 px-4 py-2 text-sm text-red-400">
+                {error}
+              </p>
+            ) : null}
             <AuthInput
               required
               type="email"
@@ -83,8 +108,12 @@ export default function SignIn() {
               placeholder="correct horse battery staple"
             />
 
-            <button type="submit" className={primaryButtonClassName}>
-              Sign in
+            <button
+              type="submit"
+              className={primaryButtonClassName}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Entrando…" : "Sign in"}
             </button>
           </form>
 

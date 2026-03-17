@@ -101,8 +101,7 @@ export default function ScreenC4({ active }: ScreenProps) {
                 strokeDasharray="120"
                 strokeDashoffset="120"
                 style={{
-                  animation: active ? "c4Draw 600ms ease forwards" : "none",
-                  animationDelay: active ? `${edge.delay}ms` : "0ms",
+                  animation: active ? `c4Draw 600ms ease ${edge.delay}ms forwards` : "none",
                 }}
               />
             ))}
@@ -114,8 +113,7 @@ export default function ScreenC4({ active }: ScreenProps) {
                   opacity: 0,
                   transform: "scale(0.88)",
                   transformOrigin: `${node.x + 40}px ${node.y + 18}px`,
-                  animation: active ? "c4In 500ms ease forwards" : "none",
-                  animationDelay: active ? `${node.delay}ms` : "0ms",
+                  animation: active ? `c4In 500ms ease ${node.delay}ms forwards` : "none",
                 }}
               >
                 <rect

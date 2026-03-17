@@ -89,7 +89,7 @@ export default function KanbanModal({
         name: cl.label?.name ?? "—",
         color: cl.label?.color ?? "#666",
       }))
-    : card?.userLabels ?? [];
+    : (card?.userLabels ?? []);
 
   const displayComments = apiComments.map((c) => ({
     id: String(c.id),
@@ -163,7 +163,7 @@ export default function KanbanModal({
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-1.5">
-                    {getCardSystemBadges(card).map((badge) => (
+                    {(getCardSystemBadges(card) ?? []).map((badge) => (
                       <SystemBadge key={badge}>{badge}</SystemBadge>
                     ))}
                   </div>
@@ -211,7 +211,7 @@ export default function KanbanModal({
                         `BV ${card.businessValue}`,
                         formatKanbanStoryStatus(card.status),
                         card.dueDateLabel,
-                        ...card.linkedChips,
+                        ...(card.linkedChips ?? []),
                       ].map((badge) => (
                         <SystemBadge key={badge}>{badge}</SystemBadge>
                       ))}
@@ -232,7 +232,12 @@ export default function KanbanModal({
                   Critérios de aceitação
                 </p>
                 <div className="space-y-2">
-                  {card.acceptanceCriteria.map((criterion) => (
+                  {(Array.isArray(card.acceptanceCriteria)
+                    ? card.acceptanceCriteria
+                    : typeof card.acceptanceCriteria === "string"
+                      ? [card.acceptanceCriteria]
+                      : []
+                  ).map((criterion) => (
                     <div
                       key={criterion}
                       className="af-surface-md bg-white/[0.03] px-3 py-2 text-sm text-white/70"
@@ -250,7 +255,7 @@ export default function KanbanModal({
                   </p>
                 </div>
                 <div className="space-y-2">
-                  {card.tasks.map((task) => (
+                  {(card.tasks ?? []).map((task) => (
                     <div
                       key={task.id}
                       className="af-surface-md flex items-start justify-between gap-3 bg-white/[0.03] px-3 py-3"
@@ -325,7 +330,7 @@ export default function KanbanModal({
                       Linked
                     </span>
                     <div className="flex flex-wrap justify-end gap-1.5">
-                      {card.linkedChips.map((badge) => (
+                      {(card.linkedChips ?? []).map((badge) => (
                         <SystemBadge key={badge}>{badge}</SystemBadge>
                       ))}
                     </div>

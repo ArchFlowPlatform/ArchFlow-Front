@@ -9,7 +9,10 @@ import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectsHeader from "@/components/projects/ProjectsHeader";
 import SectionBlock from "@/components/projects/SectionBlock";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { currentUserId, currentUserProfile } from "@/mocks/users.mock";
+import { authUserToUser } from "@/features/auth/types/auth.types";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { logout } from "@/features/auth/api/auth.api";
+import { useAppNavigate } from "@/hooks/useAppNavigate";
 import { useProjects } from "../hooks/useProjects";
 
 const pageStyle: CSSProperties = {
@@ -17,8 +20,21 @@ const pageStyle: CSSProperties = {
     'Satoshi, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, monospace',
 };
 
+const PLACEHOLDER_USER = {
+  id: "",
+  name: "Carregando…",
+  email: "",
+  type: "",
+  avatarUrl: "",
+  createdAt: "",
+  updatedAt: "",
+} as const;
+
 export default function ProjectsHubPage() {
+  const { user, setUser } = useAuth();
+  const { navigate } = useAppNavigate();
   const { projects, loading, error } = useProjects();
+  const currentUserId = user?.id ?? "";
 
   const ownerProjects = projects.filter(
     (project) => project.ownerId === currentUserId,
@@ -40,13 +56,18 @@ export default function ProjectsHubPage() {
           className="w-[17.5rem] shrink-0"
           activeItem="projects"
           signOutLabel="Sair"
+          onSignOut={async () => {
+            await logout();
+            setUser(null);
+            navigate("/");
+          }}
           header={{
             title: "ArchFlow Platform",
             subtitle: "Projects Hub",
             icon: <Layers2 className="h-4 w-4" aria-hidden="true" />,
           }}
           userSummary={{
-            user: currentUserProfile,
+            user: authUserToUser(user) ?? PLACEHOLDER_USER,
             badgeLabel: `${totalProjects} projetos`,
           }}
           items={[

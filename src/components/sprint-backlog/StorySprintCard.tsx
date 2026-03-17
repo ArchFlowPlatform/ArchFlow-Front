@@ -51,7 +51,7 @@ export default function StorySprintCard({ story }: StorySprintCardProps) {
         </div>
 
         <div className="space-y-2">
-          {story.tasks.map((task) => (
+          {(story.tasks ?? []).map((task) => (
             <StoryTaskRow key={task.id} task={task} />
           ))}
         </div>

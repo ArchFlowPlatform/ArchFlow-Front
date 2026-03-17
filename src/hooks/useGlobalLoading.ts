@@ -8,7 +8,7 @@ interface GlobalLoadingEventDetail {
 const GLOBAL_LOADING_START_EVENT = "archflow:global-loading-start";
 const GLOBAL_LOADING_STOP_EVENT = "archflow:global-loading-stop";
 
-const SHOW_DELAY_MS = 120;
+const SHOW_DELAY_MS = 0;
 const MIN_VISIBLE_MS = 280;
 export const DEFAULT_LOADING_DURATION_MS = 520;
 

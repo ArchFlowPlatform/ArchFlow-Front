@@ -39,8 +39,7 @@ function Table({ table, active, visibleFields }: TableProps) {
         opacity: 0,
         transform: "translateY(12px)",
         transformOrigin: `${table.x + 70}px ${table.y + 55}px`,
-        animation: active ? "erdIn 500ms ease forwards" : "none",
-        animationDelay: active ? `${table.delay}ms` : "0ms",
+        animation: active ? `erdIn 500ms ease ${table.delay}ms forwards` : "none",
       }}
     >
       <rect
@@ -122,8 +121,7 @@ function Relationship({ active, x1, y1, x2, y2, delay }: RelationshipProps) {
       strokeDasharray={dash}
       strokeDashoffset={dash}
       style={{
-        animation: active ? "erdDraw 600ms ease forwards" : "none",
-        animationDelay: active ? `${delay}ms` : "0ms",
+        animation: active ? `erdDraw 600ms ease ${delay}ms forwards` : "none",
       }}
     />
   );

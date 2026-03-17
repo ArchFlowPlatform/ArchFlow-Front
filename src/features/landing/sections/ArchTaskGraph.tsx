@@ -97,8 +97,9 @@ export default function ArchTaskGraph() {
                   strokeDasharray="120"
                   strokeDashoffset="120"
                   style={{
-                    animation: start ? "drawLine 600ms ease forwards" : "none",
-                    animationDelay: start ? `${line.delay}ms` : "0ms",
+                    animation: start
+                      ? `drawLine 600ms ease ${line.delay}ms forwards`
+                      : "none",
                   }}
                 />
               ))}
@@ -110,11 +111,8 @@ export default function ArchTaskGraph() {
                   style={{
                     transformOrigin: `${node.x}px 70px`,
                     animation: start
-                      ? "nodePulse 2000ms ease-in-out infinite"
+                      ? `nodePulse 2000ms ease-in-out ${afterLinesMs + index * 180}ms infinite`
                       : "none",
-                    animationDelay: start
-                      ? `${afterLinesMs + index * 180}ms`
-                      : "0ms",
                   }}
                 >
                   <circle

@@ -105,9 +105,8 @@ export default function ScreenKanban({ active }: ScreenProps) {
                         opacity: 0,
                         transform: "translateY(-10px)",
                         animation: active
-                          ? "kbCardIn 450ms ease forwards"
+                          ? `kbCardIn 450ms ease ${delay}ms forwards`
                           : "none",
-                        animationDelay: active ? `${delay}ms` : "0ms",
                         boxShadow: isFocus
                           ? "inset 1px 0 0 rgba(255,255,255,0.14), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.22)"
                           : undefined,

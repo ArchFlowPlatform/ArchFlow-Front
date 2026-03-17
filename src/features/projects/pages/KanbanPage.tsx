@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 
 import ProjectShell from "@/components/layout/ProjectShell";
@@ -8,7 +8,8 @@ import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import KanbanColumn from "@/components/kanban/KanbanColumn";
 import KanbanModal from "@/components/kanban/KanbanModal";
-import { currentUserProfile } from "@/mocks/users.mock";
+import { authUserToUser } from "@/features/auth/types/auth.types";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { useProject } from "../hooks/useProject";
 import { useKanbanBoardView } from "../hooks/useKanbanBoardView";
 import {
@@ -39,6 +40,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
   const [cardState, setCardState] = useState<KanbanBoardCardState[]>([]);
 
   const effectiveProjectId = projectId ?? "";
+  const { user } = useAuth();
   const { project } = useProject(effectiveProjectId || null);
   const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
     effectiveProjectId || ""
@@ -49,9 +51,164 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
     selectedSprint
   );
 
+  const placeholderUser = authUserToUser(user) ?? { id: "", name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" };
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? currentUserProfile;
+  const projectOwner = project?.owner ?? placeholderUser;
   const projectBadgeLabel = project ? String(project.members.length) : "0";
+
+  const baseBoard = view ?? null;
+  const columnMeta = useMemo(
+    () =>
+      baseBoard
+        ? baseBoard.columns.map(({ id, title, wipLimitHours, helpText }) => ({
+            id,
+            title,
+            wipLimitHours,
+            helpText,
+          }))
+        : [],
+    [baseBoard]
+  );
+
+  const boardCards = useMemo(
+    () =>
+      baseBoard
+        ? baseBoard.allCards.map((card) => {
+            const state = cardState.find((entry) => entry.id === card.id);
+            return {
+              ...card,
+              kanbanStatus: state?.kanbanStatus ?? card.kanbanStatus,
+              position: state?.position ?? card.position,
+            };
+          })
+        : [],
+    [baseBoard, cardState]
+  );
+
+  const filteredCards = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return boardCards.filter(
+      (card) => !query || card.searchText.includes(query)
+    );
+  }, [boardCards, searchTerm]);
+
+  const filteredColumns = useMemo(
+    () => buildKanbanColumns(filteredCards, columnMeta),
+    [columnMeta, filteredCards]
+  );
+
+  const fullBoardForCard = useMemo(
+    () =>
+      baseBoard
+        ? {
+            ...baseBoard,
+            allCards: boardCards,
+            columns: buildKanbanColumns(boardCards, columnMeta),
+          }
+        : null,
+    [baseBoard, boardCards, columnMeta]
+  );
+
+  const selectedCard =
+    fullBoardForCard && selectedCardId
+      ? getCardById(fullBoardForCard, selectedCardId)
+      : null;
+
+  useEffect(() => {
+    if (!baseBoard?.allCards) return;
+    setCardState(
+      baseBoard.allCards.map((card) => ({
+        id: card.id,
+        kanbanStatus: card.kanbanStatus,
+        position: card.position,
+      }))
+    );
+    setSelectedCardId(null);
+    setDraggingCardId(null);
+  }, [baseBoard]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeoutId = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
+  const handleDropCard = useCallback(
+    async (cardId: string, targetColumnId: KanbanColumnId) => {
+      if (!baseBoard) return;
+      const movingCard = boardCards.find((card) => card.id === cardId);
+      if (!movingCard) {
+        setDraggingCardId(null);
+        return;
+      }
+
+      if (movingCard.kanbanStatus === targetColumnId) {
+        setDraggingCardId(null);
+        return;
+      }
+
+      const targetColumn = getColumnConfigFromView(
+        baseBoard.columns,
+        targetColumnId
+      );
+      const targetCards = boardCards.filter(
+        (card) => card.id !== cardId && card.kanbanStatus === targetColumnId
+      );
+      const currentHours = getColumnUsageHours(targetCards);
+      const nextHours = currentHours + movingCard.estimatedHours;
+
+      if (
+        targetColumn &&
+        targetColumn.wipLimitHours !== null &&
+        nextHours > targetColumn.wipLimitHours
+      ) {
+        setToast({
+          title: "WIP limit exceeded",
+          body: `This column is limited to ${targetColumn.wipLimitHours}h. Moving this item would increase WIP to ${nextHours}h. Reduce work in progress or move it to another column.`,
+        });
+        setDraggingCardId(null);
+        return;
+      }
+
+      const sourceColumn = baseBoard.columns.find(
+        (c) => c.id === movingCard.kanbanStatus
+      );
+      const targetBackendColumnId = targetColumn?.backendColumnId;
+      const sourceBackendColumnId = sourceColumn?.backendColumnId;
+
+      if (
+        !effectiveProjectId ||
+        !selectedSprintId ||
+        sourceBackendColumnId == null ||
+        targetBackendColumnId == null
+      ) {
+        setDraggingCardId(null);
+        return;
+      }
+
+      try {
+        const { moveCard } = await import(
+          "@/features/board/api/board-cards.api"
+        );
+        await moveCard(
+          effectiveProjectId,
+          selectedSprintId,
+          sourceBackendColumnId,
+          Number(cardId),
+          { targetColumnId: targetBackendColumnId }
+        );
+        await refetch();
+      } catch {
+        setToast({
+          title: "Failed to move card",
+          body: "Could not update the card position. Please try again.",
+        });
+      } finally {
+        setDraggingCardId(null);
+      }
+    },
+    [baseBoard, boardCards, effectiveProjectId, selectedSprintId, refetch]
+  );
 
   if (!sprints.length || !selectedSprintId) {
     return (
@@ -63,7 +220,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
         activeNavItem="kanban"
         pageTitle="Kanban"
         pageSubtitle="This project does not have any sprints yet."
-        currentUser={currentUserProfile}
+        currentUser={placeholderUser}
         fullWidthMain
         mainColumn={
           <ProjectEmptyState
@@ -86,7 +243,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
         activeNavItem="kanban"
         pageTitle="Kanban"
         pageSubtitle="Loading board…"
-        currentUser={currentUserProfile}
+        currentUser={placeholderUser}
         fullWidthMain
         mainColumn={
           <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
@@ -107,7 +264,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
         activeNavItem="kanban"
         pageTitle="Kanban"
         pageSubtitle="Unable to load board."
-        currentUser={currentUserProfile}
+        currentUser={placeholderUser}
         fullWidthMain
         mainColumn={
           <ProjectEmptyState
@@ -120,143 +277,6 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
     );
   }
 
-  const baseBoard = view;
-  const columnMeta = useMemo(
-    () =>
-      baseBoard.columns.map(({ id, title, wipLimitHours, helpText }) => ({
-        id,
-        title,
-        wipLimitHours,
-        helpText,
-      })),
-    [baseBoard.columns]
-  );
-
-  const boardCards = useMemo(
-    () =>
-      baseBoard.allCards.map((card) => {
-        const state = cardState.find((entry) => entry.id === card.id);
-        return {
-          ...card,
-          kanbanStatus: state?.kanbanStatus ?? card.kanbanStatus,
-          position: state?.position ?? card.position,
-        };
-      }),
-    [baseBoard.allCards, cardState]
-  );
-
-  const filteredCards = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    return boardCards.filter(
-      (card) => !query || card.searchText.includes(query)
-    );
-  }, [boardCards, searchTerm]);
-
-  const filteredColumns = useMemo(
-    () => buildKanbanColumns(filteredCards, columnMeta),
-    [columnMeta, filteredCards]
-  );
-
-  const selectedCard = getCardById(
-    {
-      ...baseBoard,
-      allCards: boardCards,
-      columns: buildKanbanColumns(boardCards, columnMeta),
-    },
-    selectedCardId
-  );
-
-  useEffect(() => {
-    setCardState(
-      baseBoard.allCards.map((card) => ({
-        id: card.id,
-        kanbanStatus: card.kanbanStatus,
-        position: card.position,
-      }))
-    );
-    setSelectedCardId(null);
-    setDraggingCardId(null);
-  }, [baseBoard.allCards]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timeoutId = window.setTimeout(() => setToast(null), 4200);
-    return () => window.clearTimeout(timeoutId);
-  }, [toast]);
-
-  async function handleDropCard(cardId: string, targetColumnId: KanbanColumnId) {
-    const movingCard = boardCards.find((card) => card.id === cardId);
-    if (!movingCard) {
-      setDraggingCardId(null);
-      return;
-    }
-
-    if (movingCard.kanbanStatus === targetColumnId) {
-      setDraggingCardId(null);
-      return;
-    }
-
-    const targetColumn = getColumnConfigFromView(
-      baseBoard.columns,
-      targetColumnId
-    );
-    const targetCards = boardCards.filter(
-      (card) => card.id !== cardId && card.kanbanStatus === targetColumnId
-    );
-    const currentHours = getColumnUsageHours(targetCards);
-    const nextHours = currentHours + movingCard.estimatedHours;
-
-    if (
-      targetColumn &&
-      targetColumn.wipLimitHours !== null &&
-      nextHours > targetColumn.wipLimitHours
-    ) {
-      setToast({
-        title: "WIP limit exceeded",
-        body: `This column is limited to ${targetColumn.wipLimitHours}h. Moving this item would increase WIP to ${nextHours}h. Reduce work in progress or move it to another column.`,
-      });
-      setDraggingCardId(null);
-      return;
-    }
-
-    const sourceColumn = baseBoard.columns.find(
-      (c) => c.id === movingCard.kanbanStatus
-    );
-    const targetBackendColumnId = targetColumn?.backendColumnId;
-    const sourceBackendColumnId = sourceColumn?.backendColumnId;
-
-    if (
-      !effectiveProjectId ||
-      !selectedSprintId ||
-      sourceBackendColumnId == null ||
-      targetBackendColumnId == null
-    ) {
-      setDraggingCardId(null);
-      return;
-    }
-
-    try {
-      const { moveCard } = await import(
-        "@/features/board/api/board-cards.api"
-      );
-      await moveCard(
-        effectiveProjectId,
-        selectedSprintId,
-        sourceBackendColumnId,
-        Number(cardId),
-        { targetColumnId: targetBackendColumnId }
-      );
-      await refetch();
-    } catch {
-      setToast({
-        title: "Failed to move card",
-        body: "Could not update the card position. Please try again.",
-      });
-    } finally {
-      setDraggingCardId(null);
-    }
-  }
-
   return (
     <ProjectShell
       projectId={effectiveProjectId}
@@ -267,7 +287,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       pageTitle="Kanban"
       pageSubtitle="Fluxo visual das user stories em andamento no sprint."
       pageContextLabel={`${selectedSprint?.name ?? baseBoard.sprint.name} - Kanban`}
-      currentUser={currentUserProfile}
+      currentUser={placeholderUser}
       showSearch
       searchPlaceholder="Buscar por epic, story, tarefa..."
       searchValue={searchTerm}

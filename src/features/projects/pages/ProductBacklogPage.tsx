@@ -8,7 +8,8 @@ import TriageQueue, {
   type TriageQueueCounts,
 } from "@/components/backlog/TriageQueue";
 import ProjectShell from "@/components/layout/ProjectShell";
-import { getUserById, currentUserProfile } from "@/mocks/users.mock";
+import { authUserToUser } from "@/features/auth/types/auth.types";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import { useBacklog } from "@/features/backlog/hooks/useBacklog";
 import { useProject } from "@/features/projects/hooks/useProject";
@@ -46,16 +47,13 @@ function formatComplexityLabel(complexity: string): string {
   return "baixa";
 }
 
-function getAssigneeName(assigneeId: string): string {
-  if (!assigneeId?.trim()) {
-    return "Sem responsável";
-  }
-
-  try {
-    return getUserById(assigneeId).name;
-  } catch {
-    return "Sem responsável";
-  }
+function getAssigneeName(
+  assigneeId: string,
+  members: { user?: { id: string; name: string } }[],
+): string {
+  if (!assigneeId?.trim()) return "Sem responsável";
+  const member = members.find((m) => m.user?.id === assigneeId);
+  return member?.user?.name ?? "Sem responsável";
 }
 
 function getAcceptanceCriteriaValue(story: StoryWithLegacyCriteria): string {
@@ -98,6 +96,7 @@ export default function ProductBacklogPage({
   const [triageFilter, setTriageFilter] = useState<TriageFilter>("none");
 
   const effectiveProjectId = projectId ?? "";
+  const { user } = useAuth();
   const { project, loading: projectLoading } = useProject(
     effectiveProjectId || null,
   );
@@ -105,8 +104,18 @@ export default function ProductBacklogPage({
     effectiveProjectId || null,
   );
 
+  const members = project?.members ?? [];
+  const placeholderUser = authUserToUser(user) ?? {
+    id: "",
+    name: "—",
+    email: "",
+    type: "",
+    avatarUrl: "",
+    createdAt: "",
+    updatedAt: "",
+  };
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? currentUserProfile;
+  const projectOwner = project?.owner ?? placeholderUser;
   const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   const epics = backlog?.epics ?? [];
@@ -144,7 +153,7 @@ export default function ProductBacklogPage({
               value.toLowerCase().includes(normalizedQuery),
             );
           const userStories = (epic.userStories ?? []).filter((story) => {
-            const assigneeName = getAssigneeName(story.assigneeId ?? "");
+            const assigneeName = getAssigneeName(story.assigneeId ?? "", members);
             const statusLabel = formatStatusLabel(story.status);
             const matchesSearch =
               epicMatches ||
@@ -175,7 +184,7 @@ export default function ProductBacklogPage({
           epic.userStories.length > 0 ||
           (!normalizedQuery && triageFilter === "none"),
         ),
-    [epics, normalizedQuery, triageFilter],
+    [epics, normalizedQuery, triageFilter, members],
   );
 
   const totalStories = filteredEpics.reduce(
@@ -215,7 +224,7 @@ export default function ProductBacklogPage({
       pageTitle="Product Backlog"
       pageSubtitle="Epics e User Stories do projeto, organizados por prioridade e prontidão."
       pageContextLabel="Backlog do produto"
-      currentUser={currentUserProfile}
+      currentUser={placeholderUser}
       showSearch
       searchPlaceholder="Buscar por epic, story, responsável, status..."
       searchValue={query}
@@ -291,12 +300,10 @@ export default function ProductBacklogPage({
                         </thead>
 
                         <tbody>
-                          {epic.userStories.map((story) => {
+                          {(epic.userStories ?? []).map((story) => {
                             const storyIdStr = String(story.id);
                             const isExpanded = expandedStoryIds.has(storyIdStr);
-                            const assigneeName = getAssigneeName(
-                              story.assigneeId ?? "",
-                            );
+                            const assigneeName = getAssigneeName(story.assigneeId ?? "", members);
 
                             return (
                               <Fragment key={story.id}>
