@@ -11,8 +11,8 @@ export default function LoadingScreen({ isVisible }: LoadingScreenProps) {
         isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(109,40,217,0.18),transparent_42%),var(--site-bg,#16171d)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,18,26,0.72),rgba(20,18,26,0.94))] backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#6d28d7 0%, #16171d 42%)]" />
+      <div className="absolute inset-0 bg-[#14121a]" />
 
       <div
         role="status"

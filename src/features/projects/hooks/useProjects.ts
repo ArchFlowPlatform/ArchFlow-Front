@@ -28,10 +28,8 @@ async function enrichProjectsWithDetails(
         // leave members empty if fetch fails
       }
       const ownerMember = members.find((m) => m.role === "owner");
-      const ownerName = ownerMember?.user?.name ?? "—";
       return {
         ...project,
-        ownerName,
         members,
       } as ProjectWithDetails;
     })
