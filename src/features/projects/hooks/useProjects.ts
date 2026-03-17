@@ -1,0 +1,83 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import type { ProjectWithDetails } from "@/types/project";
+import { getProjects, getMembers } from "../api/projects.api";
+
+export interface UseProjectsResult {
+  projects: ProjectWithDetails[];
+  loading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+}
+
+/**
+ * Fetches all projects and enriches each with owner + members (ProjectWithDetails).
+ * Owner is derived from the member with role "owner"; if missing, owner is left undefined
+ * and we extend the project with a placeholder for UI compatibility.
+ */
+async function enrichProjectsWithDetails(
+  projects: Awaited<ReturnType<typeof getProjects>>
+): Promise<ProjectWithDetails[]> {
+  const enriched = await Promise.all(
+    projects.map(async (project) => {
+      let members: Awaited<ReturnType<typeof getMembers>> = [];
+      try {
+        members = await getMembers(project.id);
+      } catch {
+        // leave members empty if fetch fails
+      }
+      const ownerMember = members.find((m) => m.role === "owner");
+      const owner = ownerMember?.user;
+      if (!owner) {
+        // UI expects owner; use minimal placeholder so ProjectCard doesn't break
+        return {
+          ...project,
+          owner: {
+            id: project.ownerId,
+            name: "—",
+            email: "",
+            type: "",
+            avatarUrl: "",
+            createdAt: project.createdAt,
+            updatedAt: project.createdAt,
+          },
+          members,
+        } as ProjectWithDetails;
+      }
+      return {
+        ...project,
+        owner,
+        members,
+      } as ProjectWithDetails;
+    })
+  );
+  return enriched;
+}
+
+export function useProjects(): UseProjectsResult {
+  const [projects, setProjects] = useState<ProjectWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await getProjects();
+      const enriched = await enrichProjectsWithDetails(list);
+      setProjects(enriched);
+    } catch (e) {
+      setError(e instanceof Error ? e : new Error(String(e)));
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  return { projects, loading, error, refetch: fetchProjects };
+}
