@@ -2,11 +2,11 @@
 
 import type { KeyboardEvent, MouseEvent } from "react";
 
-import type { Project } from "@/features/projects/mocks/projects.mock";
+import type { ProjectWithDetails } from "@/types/project";
 import { useAppNavigate, shouldHandleNavigationClick } from "@/hooks/useAppNavigate";
 
 interface ProjectCardProps {
-  project: Project;
+  project: ProjectWithDetails;
 }
 
 function getStatusLabel(status: string): string {

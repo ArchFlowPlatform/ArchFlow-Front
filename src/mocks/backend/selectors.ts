@@ -83,9 +83,8 @@ export function toCamelUser(row: UserRow): User {
     id: row.id,
     name: row.name,
     email: row.email,
-    type: row.type ?? undefined,
-    passwordHash: row.password_hash,
-    avatarUrl: row.avatar_url ?? undefined,
+    type: row.type ?? "",
+    avatarUrl: row.avatar_url ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

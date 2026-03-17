@@ -10,26 +10,24 @@ import {
 } from "react";
 
 import {
-  getDefaultSprintForProject,
-  getSprintsForProject,
-  getSprintRowById,
-} from "../mocks/backend/selectors";
-import {
   DEFAULT_LOADING_DURATION_MS,
   startTimedGlobalLoading,
-} from "../hooks/useGlobalLoading";
-import type { SprintRow } from "../mocks/backend/schema";
+} from "@/hooks/useGlobalLoading";
+import { useSprints } from "@/features/sprints/hooks/useSprints";
+import type { Sprint } from "@/types/sprint";
 
 interface ProjectSprintContextValue {
   selectedSprintIdByProject: Record<string, string>;
   setSelectedSprintId: (projectId: string, sprintId: string) => void;
 }
 
-interface UseProjectSprintResult {
-  sprints: SprintRow[];
+export interface UseProjectSprintResult {
+  sprints: Sprint[];
   selectedSprintId: string | null;
-  selectedSprint: SprintRow | null;
+  selectedSprint: Sprint | null;
   setSelectedSprintId: (sprintId: string) => void;
+  loading: boolean;
+  error: Error | null;
 }
 
 const STORAGE_KEY = "archflow:selected-sprint-by-project";
@@ -54,6 +52,12 @@ function readStoredSelection(): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+function getDefaultSprintId(sprints: Sprint[]): string | null {
+  const active = sprints.find((s) => s.status === "active");
+  if (active) return active.id;
+  return sprints[0]?.id ?? null;
 }
 
 export function ProjectSprintProvider({ children }: { children: ReactNode }) {
@@ -101,12 +105,14 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
     throw new Error("useProjectSprint must be used within ProjectSprintProvider.");
   }
 
-  const sprints = useMemo(() => getSprintsForProject(projectId), [projectId]);
+  const { sprints, loading, error } = useSprints(projectId || null);
   const storedSprintId = context.selectedSprintIdByProject[projectId];
-  const selectedSprintId =
-    storedSprintId && sprints.some((sprint) => sprint.id === storedSprintId)
-      ? storedSprintId
-      : (getDefaultSprintForProject(projectId)?.id ?? null);
+  const selectedSprintId = useMemo(() => {
+    if (storedSprintId && sprints.some((s) => s.id === storedSprintId)) {
+      return storedSprintId;
+    }
+    return getDefaultSprintId(sprints);
+  }, [sprints, storedSprintId]);
 
   useEffect(() => {
     if (!selectedSprintId) {
@@ -116,13 +122,15 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
     if (context.selectedSprintIdByProject[projectId] !== selectedSprintId) {
       context.setSelectedSprintId(projectId, selectedSprintId);
     }
-  }, [
-    context,
-    projectId,
-    selectedSprintId,
-  ]);
+  }, [context, projectId, selectedSprintId]);
 
-  const selectedSprint = selectedSprintId ? getSprintRowById(selectedSprintId) : null;
+  const selectedSprint = useMemo(
+    () =>
+      selectedSprintId
+        ? sprints.find((s) => s.id === selectedSprintId) ?? null
+        : null,
+    [sprints, selectedSprintId],
+  );
 
   return {
     sprints,
@@ -136,5 +144,7 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
       startTimedGlobalLoading("sprint-transition", DEFAULT_LOADING_DURATION_MS);
       context.setSelectedSprintId(projectId, sprintId);
     },
+    loading,
+    error,
   };
 }

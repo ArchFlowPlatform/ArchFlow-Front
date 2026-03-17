@@ -9,11 +9,8 @@ import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectsHeader from "@/components/projects/ProjectsHeader";
 import SectionBlock from "@/components/projects/SectionBlock";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import {
-  currentUserId,
-  currentUserProfile,
-  mockProjects,
-} from "../mocks/projects.mock";
+import { currentUserId, currentUserProfile } from "@/mocks/users.mock";
+import { useProjects } from "../hooks/useProjects";
 
 const pageStyle: CSSProperties = {
   fontFamily:
@@ -21,14 +18,15 @@ const pageStyle: CSSProperties = {
 };
 
 export default function ProjectsHubPage() {
-  const ownerProjects = mockProjects.filter(
+  const { projects, loading, error } = useProjects();
+
+  const ownerProjects = projects.filter(
     (project) => project.ownerId === currentUserId,
   );
-
-  const projectsAsMember = mockProjects.filter(
+  const projectsAsMember = projects.filter(
     (project) =>
       project.ownerId !== currentUserId &&
-      project.members.some((member) => member.user.id === currentUserId),
+      project.members.some((member) => member.userId === currentUserId),
   );
   const totalProjects = ownerProjects.length + projectsAsMember.length;
 
@@ -65,11 +63,20 @@ export default function ProjectsHubPage() {
         <SidebarInset className="h-full min-h-0">
           <main className="h-full min-h-0 min-w-0 overflow-y-auto">
             <div className="af-surface-lg min-h-full bg-[#14121a]/40 p-3 sm:p-4 lg:p-5">
-                <ProjectsHeader
-                  title="Seus projetos"
-                  description="Projetos que voce possui e projetos em que voce colabora."
-                />
+              <ProjectsHeader
+                title="Seus projetos"
+                description="Projetos que voce possui e projetos em que voce colabora."
+              />
 
+              {loading ? (
+                <div className="af-text-secondary mt-4 text-sm">
+                  Carregando projetos…
+                </div>
+              ) : error ? (
+                <div className="mt-4 rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  {error.message}
+                </div>
+              ) : (
                 <div className="mt-4 space-y-6">
                   <SectionBlock
                     title="Projetos que voce e dono"
@@ -92,6 +99,7 @@ export default function ProjectsHubPage() {
                     ))}
                   </SectionBlock>
                 </div>
+              )}
             </div>
           </main>
         </SidebarInset>

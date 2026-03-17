@@ -8,23 +8,15 @@ import TriageQueue, {
   type TriageQueueCounts,
 } from "@/components/backlog/TriageQueue";
 import ProjectShell from "@/components/layout/ProjectShell";
-import { getUserById } from "@/mocks/users.mock";
-import {
-  currentUserProfile,
-  mockProjects,
-  type Project,
-} from "../mocks/projects.mock";
+import { getUserById, currentUserProfile } from "@/mocks/users.mock";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
-import {
-  buildProductBacklogView,
-  type UserStory,
-} from "../mocks/productBacklog.mock";
+import { useBacklog } from "@/features/backlog/hooks/useBacklog";
+import { useProject } from "@/features/projects/hooks/useProject";
+import type { UserStory } from "@/types/backlog";
 
 interface ProductBacklogPageProps {
   projectId?: string;
 }
-
-const fallbackProject: Project = mockProjects[1] ?? mockProjects[0];
 
 type StoryWithLegacyCriteria = UserStory & {
   acceptance_criteria?: string | null;
@@ -87,7 +79,7 @@ function matchesTriageFilter(
     case "missingCriteria":
       return acceptanceCriteria.length === 0;
     case "missingEffort":
-      return story.effort <= 0;
+      return (story.effort ?? 0) <= 0;
     case "hasDependencies":
       return story.dependencies.trim().length > 0;
     case "draft":
@@ -105,19 +97,23 @@ export default function ProductBacklogPage({
   const [expandedStoryIds, setExpandedStoryIds] = useState<Set<string>>(new Set());
   const [triageFilter, setTriageFilter] = useState<TriageFilter>("none");
 
-  let projectFromParam: Project | undefined;
-  if (projectId) {
-    projectFromParam = mockProjects.find((project) => project.id === projectId);
-  }
+  const effectiveProjectId = projectId ?? "";
+  const { project, loading: projectLoading } = useProject(
+    effectiveProjectId || null,
+  );
+  const { backlog, loading: backlogLoading, error: backlogError } = useBacklog(
+    effectiveProjectId || null,
+  );
 
-  const currentProject: Project = projectFromParam ?? fallbackProject;
-  const effectiveProjectId = projectId ?? currentProject.id;
-  const backlog = buildProductBacklogView(effectiveProjectId);
+  const projectName = project?.name ?? "…";
+  const projectOwner = project?.owner ?? currentUserProfile;
+  const projectBadgeLabel = project ? String(project.members.length) : "0";
 
+  const epics = backlog?.epics ?? [];
   const normalizedQuery = query.trim().toLowerCase();
   const allStories = useMemo(
-    () => backlog.epics.flatMap((epic) => epic.userStories),
-    [backlog.epics],
+    () => epics.flatMap((epic) => epic.userStories ?? []),
+    [epics],
   );
   const triageCounts = useMemo<TriageQueueCounts>(
     () => ({
@@ -140,15 +136,15 @@ export default function ProductBacklogPage({
   );
   const filteredEpics = useMemo(
     () =>
-      backlog.epics
+      epics
         .map((epic) => {
           const epicMatches =
             !normalizedQuery ||
             [epic.name, epic.description].some((value) =>
               value.toLowerCase().includes(normalizedQuery),
             );
-          const userStories = epic.userStories.filter((story) => {
-            const assigneeName = getAssigneeName(story.assigneeId);
+          const userStories = (epic.userStories ?? []).filter((story) => {
+            const assigneeName = getAssigneeName(story.assigneeId ?? "");
             const statusLabel = formatStatusLabel(story.status);
             const matchesSearch =
               epicMatches ||
@@ -179,7 +175,7 @@ export default function ProductBacklogPage({
           epic.userStories.length > 0 ||
           (!normalizedQuery && triageFilter === "none"),
         ),
-    [backlog.epics, normalizedQuery, triageFilter],
+    [epics, normalizedQuery, triageFilter],
   );
 
   const totalStories = filteredEpics.reduce(
@@ -207,12 +203,14 @@ export default function ProductBacklogPage({
     setTriageFilter("none");
   }
 
+  const loading = projectLoading || backlogLoading;
+
   return (
     <ProjectShell
       projectId={effectiveProjectId}
-      projectName={currentProject.name}
-      projectOwner={currentProject.owner}
-      projectBadgeLabel={String(currentProject.members.length)}
+      projectName={projectName}
+      projectOwner={projectOwner}
+      projectBadgeLabel={projectBadgeLabel}
       activeNavItem="backlog"
       pageTitle="Product Backlog"
       pageSubtitle="Epics e User Stories do projeto, organizados por prioridade e prontidão."
@@ -223,7 +221,15 @@ export default function ProductBacklogPage({
       searchValue={query}
       onSearchChange={setQuery}
       mainColumn={
-        backlog.epics.length === 0 ? (
+        loading ? (
+          <div className="af-text-secondary text-sm">
+            Carregando backlog…
+          </div>
+        ) : backlogError ? (
+          <div className="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {backlogError.message}
+          </div>
+        ) : epics.length === 0 ? (
           <ProjectEmptyState
             title="No user stories have been added yet."
             description="This project is still empty. Add backlog items to start planning epics, stories, and sprint candidates."
@@ -250,7 +256,7 @@ export default function ProductBacklogPage({
                         </h2>
 
                         <span className="af-surface-sm af-accent-chip inline-flex items-center px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/80">
-                          {epic.priority}
+                          P{epic.priority}
                         </span>
                       </div>
 
@@ -286,8 +292,11 @@ export default function ProductBacklogPage({
 
                         <tbody>
                           {epic.userStories.map((story) => {
-                            const isExpanded = expandedStoryIds.has(story.id);
-                            const assigneeName = getAssigneeName(story.assigneeId);
+                            const storyIdStr = String(story.id);
+                            const isExpanded = expandedStoryIds.has(storyIdStr);
+                            const assigneeName = getAssigneeName(
+                              story.assigneeId ?? "",
+                            );
 
                             return (
                               <Fragment key={story.id}>
@@ -301,7 +310,9 @@ export default function ProductBacklogPage({
                                           ? `Ocultar detalhes de ${story.title}`
                                           : `Mostrar detalhes de ${story.title}`
                                       }
-                                      onClick={() => toggleStoryExpanded(story.id)}
+                                      onClick={() =>
+                                        toggleStoryExpanded(storyIdStr)
+                                      }
                                       className="af-focus-ring af-accent-hover inline-flex h-7 w-7 items-center justify-center text-white/60 transition hover:bg-white/[0.03] hover:text-[var(--accent-soft-35)]"
                                     >
                                       {isExpanded ? (
@@ -379,7 +390,7 @@ export default function ProductBacklogPage({
                                             </p>
                                             <div className="flex flex-wrap gap-1.5 text-[10px] text-white/72">
                                               <span className="af-surface-sm inline-flex h-6 items-center bg-white/5 px-2 py-0 leading-none">
-                                                Effort {story.effort}
+                                                Effort {story.effort ?? 0}
                                               </span>
                                               <span className="af-surface-sm inline-flex h-6 items-center bg-white/5 px-2 py-0 leading-none">
                                                 {formatPriorityLabel(story.priority)}
@@ -413,53 +424,57 @@ export default function ProductBacklogPage({
           </div>
         )
       }
-      sideColumn={backlog.epics.length === 0 ? undefined : (
-        <>
-          <TriageQueue
-            counts={triageCounts}
-            activeFilter={triageFilter}
-            onSelectFilter={handleSelectTriageFilter}
-            onClearFilter={handleClearTriageFilter}
-          />
+      sideColumn={
+        loading || backlogError || epics.length === 0
+          ? undefined
+          : (
+            <>
+              <TriageQueue
+                counts={triageCounts}
+                activeFilter={triageFilter}
+                onSelectFilter={handleSelectTriageFilter}
+                onClearFilter={handleClearTriageFilter}
+              />
 
-          <section className="af-surface-lg bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
-            <header className="af-separator-b pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-semibold text-white">Métricas</h2>
-                  <p className="af-text-secondary mt-1 text-xs">
-                    Visão rápida do backlog.
-                  </p>
-                </div>
+              <section className="af-surface-lg bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
+                <header className="af-separator-b pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-sm font-semibold text-white">Métricas</h2>
+                      <p className="af-text-secondary mt-1 text-xs">
+                        Visão rápida do backlog.
+                      </p>
+                    </div>
 
-                <span className="af-surface-sm af-accent-chip inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/80">
-                  Snapshot
-                </span>
-              </div>
-            </header>
+                    <span className="af-surface-sm af-accent-chip inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/80">
+                      Snapshot
+                    </span>
+                  </div>
+                </header>
 
-            <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
-              <div className="af-surface-md af-accent-panel bg-white/5 px-3 py-2.5">
-                <dt className="af-text-tertiary text-[10px] font-semibold uppercase tracking-[0.16em]">
-                  Stories
-                </dt>
-                <dd className="mt-1 text-lg font-semibold text-white">
-                  {totalStories}
-                </dd>
-              </div>
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                  <div className="af-surface-md af-accent-panel bg-white/5 px-3 py-2.5">
+                    <dt className="af-text-tertiary text-[10px] font-semibold uppercase tracking-[0.16em]">
+                      Stories
+                    </dt>
+                    <dd className="mt-1 text-lg font-semibold text-white">
+                      {totalStories}
+                    </dd>
+                  </div>
 
-              <div className="af-surface-md bg-white/5 px-3 py-2.5">
-                <dt className="af-text-tertiary text-[10px] font-semibold uppercase tracking-[0.16em]">
-                  Epics
-                </dt>
-                <dd className="mt-1 text-lg font-semibold text-white">
-                  {backlog.epics.length}
-                </dd>
-              </div>
-            </dl>
-          </section>
-        </>
-      )}
+                  <div className="af-surface-md bg-white/5 px-3 py-2.5">
+                    <dt className="af-text-tertiary text-[10px] font-semibold uppercase tracking-[0.16em]">
+                      Epics
+                    </dt>
+                    <dd className="mt-1 text-lg font-semibold text-white">
+                      {epics.length}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+            </>
+          )
+      }
     />
   );
 }
