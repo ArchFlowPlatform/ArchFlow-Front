@@ -1,4 +1,4 @@
-import type { StoryTaskRowView } from "../../views/projects/sprint-backlog/_mocks/sprintBacklog.mock";
+import type { StoryTaskRowView } from "@/features/projects/mocks/sprintBacklog.mock";
 import TaskRowCard from "../sprint/TaskRowCard";
 
 interface StoryTaskRowProps {

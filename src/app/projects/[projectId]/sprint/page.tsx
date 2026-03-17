@@ -1,4 +1,4 @@
-import SprintPage from "@/views/projects/sprint/SprintPage";
+import SprintPage from "@/features/projects/pages/SprintPage";
 
 interface PageProps {
   params: Promise<{ projectId: string }>;

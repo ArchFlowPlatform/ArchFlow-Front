@@ -2,7 +2,7 @@
 
 import type { KeyboardEvent, MouseEvent } from "react";
 
-import type { Project } from "@/views/projects/_mocks/projects.mock";
+import type { Project } from "@/features/projects/mocks/projects.mock";
 import { useAppNavigate, shouldHandleNavigationClick } from "@/hooks/useAppNavigate";
 
 interface ProjectCardProps {

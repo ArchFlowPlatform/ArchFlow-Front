@@ -1,4 +1,4 @@
-import type { SprintTaskView } from "../../views/projects/sprint/_mocks/sprint.mock";
+import type { SprintTaskView } from "@/features/projects/mocks/sprint.mock";
 import TaskRowCard from "./TaskRowCard";
 
 interface SprintTasksPanelProps {

@@ -2,9 +2,9 @@
 
 ## Visão Geral
 
-Este repositório contém a aplicação **ArchFlow** – architecture-driven project management.
+Este repositório contém a aplicação **ArchFlow** – frontend de gerenciamento de projetos orientado a arquitetura (architecture-driven project management).
 
-O projeto foi migrado de **Vite** para **Next.js 15** com App Router, seguindo uma arquitetura enterprise com estrutura baseada em features.
+A aplicação utiliza **Next.js 15** com App Router e estrutura **feature-first**, preparada para integração com API backend.
 
 ### Tecnologias
 
@@ -12,23 +12,28 @@ O projeto foi migrado de **Vite** para **Next.js 15** com App Router, seguindo u
 * **React 19**
 * **Tailwind CSS**
 * **Recharts**
-* **Axios** (service layer)
-* **Zod** (validation)
+* **Axios** (camada de serviços)
+* **Zod** (validação)
 * **shadcn/ui** (componentes base)
 
 ### Estrutura do Projeto
 
+A estrutura segue arquitetura **feature-first** e **Next.js App Router**. As rotas ficam em `app/` e importam componentes de página das features; a camada `views/` foi removida. Detalhes em [`docs/REFACTOR-REMOVE-VIEWS-COMPLETION.md`](docs/REFACTOR-REMOVE-VIEWS-COMPLETION.md).
+
 ```
-src
-├── app/              # Next.js App Router (rotas, layouts)
-├── views/            # Componentes de página (ex-“pages”)
-├── components/       # Componentes reutilizáveis (ui, charts, layout, …)
-├── features/         # Lógica de domínio por feature
-├── services/         # Camada de API (Axios)
-├── hooks/            # Hooks reutilizáveis
-├── lib/              # Utilitários, http-client, schemas
-├── types/            # Tipos TypeScript compartilhados
-└── contexts/         # Contextos React
+src/
+├── app/                  # Next.js App Router (/, /signin, /projects, /projects/[id]/backlog|kanban|sprint…)
+├── components/           # UI compartilhada (auth, backlog, kanban, layout, projects, sprint, ui)
+├── features/             # Lógica por feature
+│   ├── auth/             # Login, cadastro (components, api, context, types)
+│   ├── landing/          # Landing (components, data, sections, hero-panel, types)
+│   └── projects/         # Projetos: pages (hub, backlog, kanban, sprint-backlog, sprint) + mocks
+├── contexts/             # Contextos React (ex.: ProjectSprintContext)
+├── hooks/                # Hooks reutilizáveis
+├── lib/                  # Utilitários, http-client, schemas
+├── mocks/                # Dados mock compartilhados (backend, users)
+├── services/             # Camada de API (Axios)
+└── types/                # Tipos TypeScript compartilhados
 ```
 
 ### Scripts
@@ -42,99 +47,37 @@ npm run lint     # ESLint
 
 ---
 
-## Histórico: Preview de Design
+## Objetivo
 
-Este projeto evoluiu de um **preview de design** para uma aplicação estruturada.
+O ArchFlow é a aplicação de gestão de projetos que combina:
 
-O objetivo original era demonstrar e validar:
-
-* Interface do usuário (UI)
-* Fluxos de navegação
-* Estrutura das telas
-* Organização visual do produto
-* Experiência de uso para Scrum e Kanban
-
-Esta implementação **não representa a aplicação final**.
-
----
-
-## Objetivo do Repositório
-
-Este projeto foi criado para servir como um **protótipo visual da aplicação**, permitindo validar o design antes da implementação completa do sistema.
-
-Isso permite:
-
-* validar o layout das telas
-* testar fluxos de navegação
-* experimentar decisões de UX
-* ajustar a identidade visual do produto
-* alinhar design e desenvolvimento
-
-Por esse motivo, diversas funcionalidades utilizam **dados mockados (mocks)** e **comportamentos simulados**.
-
----
-
-## Aviso Importante
-
-Este repositório **não contém a implementação real da aplicação**.
-
-Ele deve ser considerado apenas como um **preview de interface**.
-
-Limitações deste projeto:
-
-* uso de **dados mockados**
-* algumas interações são apenas **visuais**
-* **não há integração com API**
-* **não possui arquitetura de produção**
-
----
-
-## Implementação Futura
-
-A aplicação real será desenvolvida em um **repositório separado**, utilizando uma arquitetura adequada para produção.
-
-Tecnologias previstas:
-
-* **Next.js** para o frontend
-* comunicação com **API backend**
-* arquitetura organizada e escalável
-* separação clara de responsabilidades
-* gerenciamento adequado de estado e dados
-
-Nesta implementação final, todos os dados serão carregados por meio de **requisições para APIs**, substituindo os mocks utilizados neste preview.
-
----
-
-## Escopo deste Preview
-
-Este preview demonstra o design e os fluxos de telas como:
-
-* Navegação entre projetos
-* Product Backlog
-* Tela de Sprint
-* Sprint Backlog
+* Navegação entre projetos e times
+* Product Backlog (epics e user stories)
+* Sprint Backlog e planejamento de sprint
 * Quadro Kanban
-* Gráfico de Burndown
-* Métricas de Sprint
+* Visão de Sprint com burndown e métricas
 * Estados de tela (vazio, carregamento, etc.)
 
-O foco principal é validar **layout, hierarquia visual e experiência de uso**.
+Parte das funcionalidades utiliza **dados mockados** enquanto a integração com a API backend avança; a estrutura (services, features, tipos) está preparada para consumo real da API.
 
 ---
 
-## Por que criar um preview de design primeiro?
+## Funcionalidades
 
-Criar um preview de interface antes da implementação completa permite:
+* **Landing** – página inicial e apresentação do produto
+* **Autenticação** – sign in e sign up (fluxos preparados para API)
+* **Projetos** – hub de projetos, backlog do produto, kanban, sprint backlog e tela de sprint com gráfico de burndown e painel de tarefas
 
-* validar ideias rapidamente
-* reduzir retrabalho na implementação final
-* alinhar design e engenharia
-* melhorar a experiência do produto antes da construção real
+---
+
+## Próximos passos
+
+* Integração completa com **API backend**
+* Substituição progressiva de mocks por dados reais via serviços (Axios)
+* Autenticação e sessão vinculadas à API
 
 ---
 
 ## Resumo
 
-Este repositório existe para **validar o design e a experiência do produto**.
-
-A **aplicação real será desenvolvida posteriormente**, utilizando **Next.js**, arquitetura adequada e integração completa com APIs.
+Este repositório é o **frontend da aplicação ArchFlow**: aplicação real em **Next.js 15**, com arquitetura feature-first e App Router, em evolução para integração total com a API backend.

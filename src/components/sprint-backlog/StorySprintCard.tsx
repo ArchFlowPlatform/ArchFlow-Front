@@ -1,5 +1,5 @@
 import StoryTaskRow from "./StoryTaskRow";
-import type { SprintBacklogStoryView } from "../../views/projects/sprint-backlog/_mocks/sprintBacklog.mock";
+import type { SprintBacklogStoryView } from "@/features/projects/mocks/sprintBacklog.mock";
 import UserAvatar from "../ui/UserAvatar";
 
 interface StorySprintCardProps {

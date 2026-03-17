@@ -1,4 +1,4 @@
-import SprintBacklogPage from "@/views/projects/sprint-backlog/SprintBacklogPage";
+import SprintBacklogPage from "@/features/projects/pages/SprintBacklogPage";
 
 interface PageProps {
   params: Promise<{ projectId: string }>;

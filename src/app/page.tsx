@@ -1,5 +1,5 @@
-import ArchFlowLanding from "@/views/ArchFlowLanding/ArchFlowLanding";
+import LandingPage from "@/features/landing/LandingPage";
 
 export default function HomePage() {
-  return <ArchFlowLanding />;
+  return <LandingPage />;
 }

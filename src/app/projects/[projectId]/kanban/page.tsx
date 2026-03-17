@@ -1,4 +1,4 @@
-import KanbanPage from "@/views/projects/kanban/KanbanPage";
+import KanbanPage from "@/features/projects/pages/KanbanPage";
 
 interface PageProps {
   params: Promise<{ projectId: string }>;

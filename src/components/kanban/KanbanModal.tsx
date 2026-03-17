@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 
-import type { KanbanCardView } from "../../views/projects/kanban/_mocks/kanban.mock";
+import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
 import {
   formatKanbanStoryStatus,
   getCardSystemBadges,
-} from "../../views/projects/kanban/_mocks/kanban.mock";
+} from "@/features/projects/mocks/kanban.mock";
 import UserAvatar from "../ui/UserAvatar";
 import SystemBadge from "./SystemBadge";
 import UserLabelBadge from "./UserLabelBadge";

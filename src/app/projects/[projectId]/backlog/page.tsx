@@ -1,4 +1,4 @@
-import ProductBacklogPage from "@/views/projects/backlog/ProductBacklogPage";
+import ProductBacklogPage from "@/features/projects/pages/ProductBacklogPage";
 
 interface PageProps {
   params: Promise<{ projectId: string }>;

@@ -1,6 +1,6 @@
 import UserAvatar from "../ui/UserAvatar";
-import type { KanbanCardView } from "../../views/projects/kanban/_mocks/kanban.mock";
-import { getInlineCardSystemBadges } from "../../views/projects/kanban/_mocks/kanban.mock";
+import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
+import { getInlineCardSystemBadges } from "@/features/projects/mocks/kanban.mock";
 import SystemBadge from "./SystemBadge";
 import UserLabelBadge from "./UserLabelBadge";
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import AuthProviderWrapper from "@/components/providers/AuthProviderWrapper";
 import GlobalLoadingOverlay from "@/components/ui/GlobalLoadingOverlay";
 import "@/app/globals.css";
 
@@ -25,8 +26,10 @@ export default function RootLayout({
             'Satoshi, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, monospace',
         }}
       >
-        {children}
-        <GlobalLoadingOverlay />
+        <AuthProviderWrapper>
+          {children}
+          <GlobalLoadingOverlay />
+        </AuthProviderWrapper>
       </body>
     </html>
   );
