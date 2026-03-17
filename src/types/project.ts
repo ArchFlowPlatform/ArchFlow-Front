@@ -11,15 +11,15 @@ export interface Project {
   description: string;
   status: ProjectStatus;
   ownerId: string;
+  ownerName: string;
   createdAt: string;
 }
 
 /**
- * Optional view: project with owner and members resolved.
- * Built from Project + getMembers + getOwner when needed by UI.
+ * Optional view: project with owner name and members resolved.
+ * Built from Project + getMembers when needed by UI.
  */
 export interface ProjectWithDetails extends Project {
-  owner: User;
   members: ProjectMember[];
 }
 

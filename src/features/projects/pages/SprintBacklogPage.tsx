@@ -57,7 +57,7 @@ export default function SprintBacklogPage({
 
   const placeholderUser = authUserToUser(user) ?? { id: "", name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" };
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? placeholderUser;
+  const projectOwnerName = project?.ownerName ?? "—";
   const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   const stories = view?.stories ?? [];
@@ -178,7 +178,7 @@ export default function SprintBacklogPage({
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint-backlog"
         pageTitle="Sprint Backlog"
@@ -200,7 +200,7 @@ export default function SprintBacklogPage({
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint-backlog"
         pageTitle="Sprint Backlog"
@@ -220,7 +220,7 @@ export default function SprintBacklogPage({
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint-backlog"
         pageTitle="Sprint Backlog"
@@ -262,12 +262,12 @@ export default function SprintBacklogPage({
     <ProjectShell
       projectId={effectiveProjectId}
       projectName={projectName}
-      projectOwner={projectOwner}
+      projectOwnerName={projectOwnerName}
       projectBadgeLabel={projectBadgeLabel}
       activeNavItem="sprint-backlog"
       pageTitle="Sprint Backlog"
       pageSubtitle="Stories planejadas para entrega nesta sprint, com tarefas e distribuição por responsável."
-      pageContextLabel={`${sprint.name} - itens planejados`}
+      pageContextLabel={`${sprint?.name ?? "Sprint"} - itens planejados`}
       currentUser={placeholderUser}
       showSearch
       searchPlaceholder="Buscar stories, tarefas ou responsáveis..."

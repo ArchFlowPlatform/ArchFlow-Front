@@ -28,26 +28,10 @@ async function enrichProjectsWithDetails(
         // leave members empty if fetch fails
       }
       const ownerMember = members.find((m) => m.role === "owner");
-      const owner = ownerMember?.user;
-      if (!owner) {
-        // UI expects owner; use minimal placeholder so ProjectCard doesn't break
-        return {
-          ...project,
-          owner: {
-            id: project.ownerId,
-            name: "—",
-            email: "",
-            type: "",
-            avatarUrl: "",
-            createdAt: project.createdAt,
-            updatedAt: project.createdAt,
-          },
-          members,
-        } as ProjectWithDetails;
-      }
+      const ownerName = ownerMember?.user?.name ?? "—";
       return {
         ...project,
-        owner,
+        ownerName,
         members,
       } as ProjectWithDetails;
     })

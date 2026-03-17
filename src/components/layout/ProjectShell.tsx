@@ -22,7 +22,7 @@ const pageStyle: CSSProperties = {
 interface ProjectShellProps {
   projectId: string;
   projectName: string;
-  projectOwner: User;
+  projectOwnerName: string;
   /** Optional badge in project summary (e.g. member count). Shown when provided. */
   projectBadgeLabel?: string;
   activeNavItem: ProjectSidebarNavItemId;
@@ -43,7 +43,7 @@ interface ProjectShellProps {
 export default function ProjectShell({
   projectId,
   projectName,
-  projectOwner,
+  projectOwnerName,
   projectBadgeLabel,
   activeNavItem,
   pageTitle,
@@ -73,7 +73,7 @@ export default function ProjectShell({
         <ProjectSidebar
           className="w-[17.5rem] shrink-0"
           projectName={projectName}
-          projectOwner={projectOwner}
+          projectOwnerName={projectOwnerName}
           projectBadgeLabel={projectBadgeLabel}
           activeItem={activeNavItem}
           navItems={[

@@ -64,7 +64,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
   );
 
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? PLACEHOLDER_USER;
+  const projectOwnerName = project?.ownerName ?? "—";
   const projectBadgeLabel = project ? String(project.members.length) : "0";
   const currentUser = authUserToUser(user) ?? PLACEHOLDER_USER;
   const normalizedQuery = query.trim().toLowerCase();
@@ -85,7 +85,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint"
         pageTitle="Sprint"
@@ -107,7 +107,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint"
         pageTitle="Sprint"
@@ -127,7 +127,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="sprint"
         pageTitle="Sprint"
@@ -151,7 +151,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
     <ProjectShell
       projectId={effectiveProjectId}
       projectName={projectName}
-      projectOwner={projectOwner}
+      projectOwnerName={projectOwnerName}
       projectBadgeLabel={projectBadgeLabel}
       activeNavItem="sprint"
       pageTitle="Sprint"

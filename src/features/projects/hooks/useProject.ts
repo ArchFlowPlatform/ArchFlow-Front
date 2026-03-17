@@ -21,25 +21,8 @@ async function enrichProjectWithDetails(
     // leave members empty if fetch fails
   }
   const ownerMember = members.find((m) => m.role === "owner");
-  const owner = ownerMember?.user;
-  if (!owner) {
-    return {
-      ...project,
-      owner: {
-        id: project.ownerId,
-        name: "—",
-        email: "",
-        type: "",
-        avatarUrl: "",
-        createdAt: project.createdAt,
-        updatedAt: project.createdAt,
-      },
-      members,
-    } as ProjectWithDetails;
-  }
   return {
     ...project,
-    owner,
     members,
   } as ProjectWithDetails;
 }
@@ -60,6 +43,7 @@ export function useProject(projectId: string | null): UseProjectResult {
     setError(null);
     try {
       const data = await getProjectById(projectId);
+      console.log("data", data);
       const enriched = await enrichProjectWithDetails(data);
       setProject(enriched);
     } catch (e) {

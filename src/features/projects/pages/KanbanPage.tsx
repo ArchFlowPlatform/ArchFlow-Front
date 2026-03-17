@@ -53,7 +53,8 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
 
   const placeholderUser = authUserToUser(user) ?? { id: "", name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" };
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? placeholderUser;
+  const projectOwnerName = project?.ownerName ?? "—";
+  console.log("projectOwnerName", project?.ownerName);
   const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   const baseBoard = view ?? null;
@@ -215,7 +216,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="kanban"
         pageTitle="Kanban"
@@ -238,7 +239,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="kanban"
         pageTitle="Kanban"
@@ -259,7 +260,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       <ProjectShell
         projectId={effectiveProjectId}
         projectName={projectName}
-        projectOwner={projectOwner}
+        projectOwnerName={projectOwnerName}
         projectBadgeLabel={projectBadgeLabel}
         activeNavItem="kanban"
         pageTitle="Kanban"
@@ -281,12 +282,12 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
     <ProjectShell
       projectId={effectiveProjectId}
       projectName={projectName}
-      projectOwner={projectOwner}
+      projectOwnerName={projectOwnerName}
       projectBadgeLabel={projectBadgeLabel}
       activeNavItem="kanban"
       pageTitle="Kanban"
       pageSubtitle="Fluxo visual das user stories em andamento no sprint."
-      pageContextLabel={`${selectedSprint?.name ?? baseBoard.sprint.name} - Kanban`}
+      pageContextLabel={`${selectedSprint?.name ?? baseBoard?.sprint?.name ?? "Sprint"} - Kanban`}
       currentUser={placeholderUser}
       showSearch
       searchPlaceholder="Buscar por epic, story, tarefa..."
@@ -294,7 +295,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       onSearchChange={(v) => setSearchTerm(v)}
       fullWidthMain
       mainColumn={
-        baseBoard.allCards.length === 0 ? (
+        (baseBoard?.allCards?.length ?? 0) === 0 ? (
           <ProjectEmptyState
             title="No cards available."
             description="This sprint board is empty. Add cards to start tracking stories and task flow."

@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 
 import { cx } from "@/lib/utils/cx";
-import type { User } from "@/types/user";
 import UserAvatar from "../ui/UserAvatar";
 import { useAppNavigate, shouldHandleNavigationClick } from "@/hooks/useAppNavigate";
 import {
@@ -38,7 +37,7 @@ export interface ProjectSidebarNavItem {
 
 export interface ProjectSidebarProps {
   projectName: string;
-  projectOwner: User;
+  projectOwnerName: string;
   /** Optional badge for project summary (e.g. member count). Same style as Projects hub user summary badge. */
   projectBadgeLabel?: string;
   navItems: ProjectSidebarNavItem[];
@@ -49,7 +48,7 @@ export interface ProjectSidebarProps {
 
 export default function ProjectSidebar({
   projectName,
-  projectOwner,
+  projectOwnerName,
   projectBadgeLabel,
   navItems,
   activeItem,
@@ -57,7 +56,7 @@ export default function ProjectSidebar({
   footer,
 }: ProjectSidebarProps) {
   const { navigate } = useAppNavigate();
-  const ownerLabel = `owner: ${projectOwner.name}`;
+  const ownerLabel = `owner: ${projectOwnerName}`;
   const scrumItemIds: ProjectSidebarNavItemId[] = [
     "backlog",
     "sprint",
@@ -188,7 +187,7 @@ export default function ProjectSidebar({
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex items-center gap-3">
                 <UserAvatar
-                  user={projectOwner}
+                  user={{ name: projectOwnerName, avatarUrl: "" }}
                   className="af-surface-sm h-9 w-9 shrink-0 bg-white/5 text-sm font-semibold text-white/80"
                 />
                 <div className="min-w-0">

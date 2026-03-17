@@ -115,7 +115,7 @@ export default function ProductBacklogPage({
     updatedAt: "",
   };
   const projectName = project?.name ?? "…";
-  const projectOwner = project?.owner ?? placeholderUser;
+  const projectOwnerName = project?.ownerName ?? "—";
   const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   const epics = backlog?.epics ?? [];
@@ -218,7 +218,7 @@ export default function ProductBacklogPage({
     <ProjectShell
       projectId={effectiveProjectId}
       projectName={projectName}
-      projectOwner={projectOwner}
+      projectOwnerName={projectOwnerName}
       projectBadgeLabel={projectBadgeLabel}
       activeNavItem="backlog"
       pageTitle="Product Backlog"

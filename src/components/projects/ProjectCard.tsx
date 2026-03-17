@@ -74,7 +74,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               {project.name}
             </h3>
             <p className="af-text-tertiary truncate text-[11px]">
-              owner: {project.owner.name}
+              owner: {project.ownerName}
             </p>
           </div>
         </div>

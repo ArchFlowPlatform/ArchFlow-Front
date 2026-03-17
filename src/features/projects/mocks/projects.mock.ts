@@ -28,7 +28,7 @@ export interface Project {
   name: string;
   description: string;
   ownerId: string;
-  owner: User;
+  ownerName: string;
   members: ProjectMember[];
   status: ProjectStatus;
   createdAt: string;
@@ -55,7 +55,7 @@ function buildProjectView(projectId: string): Project {
     name: project.name,
     description: project.description ?? "",
     ownerId: project.owner_id,
-    owner,
+    ownerName: owner.name,
     members,
     status: project.status,
     createdAt: project.created_at,
