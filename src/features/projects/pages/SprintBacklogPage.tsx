@@ -5,12 +5,14 @@ import { useCallback, useMemo, useState } from "react";
 import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
+import InlineToast from "@/components/ui/InlineToast";
 import StorySprintCard from "@/components/sprint-backlog/StorySprintCard";
 import WorkloadPanel from "@/components/sprint-backlog/WorkloadPanel";
 import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { createSprintItem, deleteSprintItem } from "@/features/sprint-items/api/sprint-items.api";
 import { createTask, deleteTask } from "@/features/story-tasks/api/story-tasks.api";
+import { useToast } from "@/hooks/useToast";
 import { useProject } from "../hooks/useProject";
 import { useSprintBacklogView } from "../hooks/useSprintBacklogView";
 import type {
@@ -46,6 +48,7 @@ export default function SprintBacklogPage({
   const [query, setQuery] = useState("");
   const [mutating, setMutating] = useState(false);
   const [addStoryId, setAddStoryId] = useState("");
+  const { toast, showError } = useToast();
 
   const effectiveProjectId = projectId ?? "";
   const { user } = useAuth();
@@ -67,7 +70,7 @@ export default function SprintBacklogPage({
         await action();
         await refetch();
       } catch (e) {
-        globalThis.alert(e instanceof Error ? e.message : String(e));
+        showError(e instanceof Error ? e.message : String(e));
       } finally {
         setMutating(false);
       }
@@ -280,6 +283,8 @@ export default function SprintBacklogPage({
   );
 
   return (
+    <>
+    <InlineToast toast={toast} />
     <ProjectShell
       projectId={effectiveProjectId}
       projectName={projectName}
@@ -418,5 +423,6 @@ export default function SprintBacklogPage({
         )
       }
     />
+    </>
   );
 }

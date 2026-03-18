@@ -4,6 +4,8 @@
  */
 
 import { get, post, patch } from "@/lib/http-client";
+import { safeParseObject } from "@/lib/api-validation";
+import { ProductBacklogSchema } from "@/lib/schemas/api.schema";
 import type { ProductBacklog, Epic, UserStory } from "@/types/backlog";
 import type {
   UpdateBacklogRequest,
@@ -25,7 +27,7 @@ export async function getBacklog(projectId: string): Promise<ProductBacklog> {
   if (!response.success || !response.data) {
     throw new Error(response.message ?? "Failed to fetch backlog");
   }
-  const data = response.data;
+  const data = safeParseObject<ProductBacklog>(ProductBacklogSchema, response.data, "getBacklog");
   return {
     ...data,
     epics: (data.epics ?? []).map((epic) => ({

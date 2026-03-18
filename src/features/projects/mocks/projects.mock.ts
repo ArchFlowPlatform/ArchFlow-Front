@@ -1,20 +1,8 @@
-import {
-  currentUserId,
-  currentUserProfile,
-  mockUsers,
-} from "@/mocks/users.mock";
-import {
-  getProjectMembers,
-  getProjectRowById,
-  getUserById,
-  projectsById,
-} from "@/mocks/backend/selectors";
-import { projectsTable } from "@/mocks/backend/rawData";
-import type {
-  ProjectMemberRole,
-  ProjectStatus,
-} from "@/mocks/backend/schema";
+import { USE_MOCKS } from "@/lib/env";
 import type { User } from "@/types/user";
+
+type ProjectMemberRole = "owner" | "scrum_master" | "developer" | "product_owner";
+type ProjectStatus = "active" | "archived" | "deleted";
 
 export interface ProjectMember {
   userId: string;
@@ -35,34 +23,78 @@ export interface Project {
   updatedAt: string;
 }
 
-export { currentUserId, currentUserProfile, mockUsers };
 export type { User };
 
-function buildProjectView(projectId: string): Project {
-  const project = getProjectRowById(projectId);
-  const owner = getUserById(project.owner_id);
-  const members = getProjectMembers(project.id)
-    .map((member) => ({
-      userId: member.user_id,
-      user: getUserById(member.user_id),
-      role: member.role,
-      joinedAt: member.joined_at,
-    }))
-    .sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
+// ── Mock-only exports (gated behind NEXT_PUBLIC_USE_MOCKS) ──
 
-  return {
-    id: project.id,
-    name: project.name,
-    description: project.description ?? "",
-    ownerId: project.owner_id,
-    ownerName: owner.name,
-    members,
-    status: project.status,
-    createdAt: project.created_at,
-    updatedAt: project.updated_at,
+function getMockUserExports() {
+  if (!USE_MOCKS) {
+    throw new Error(
+      "Mock user data requires NEXT_PUBLIC_USE_MOCKS=true. " +
+        "Production code should use real API hooks instead.",
+    );
+  }
+  /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
+  const usersMock = require("@/mocks/users.mock") as {
+    currentUserId: string;
+    currentUserProfile: User;
+    mockUsers: User[];
   };
+  /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
+  return usersMock;
 }
 
-export const mockProjects: Project[] = projectsTable
-  .filter((project) => projectsById.has(project.id))
-  .map((project) => buildProjectView(project.id));
+export function getCurrentUserId(): string {
+  return getMockUserExports().currentUserId;
+}
+export function getCurrentUserProfile(): User {
+  return getMockUserExports().currentUserProfile;
+}
+export function getMockUsers(): User[] {
+  return getMockUserExports().mockUsers;
+}
+
+export function buildMockProjects(): Project[] {
+  if (!USE_MOCKS) {
+    throw new Error(
+      "buildMockProjects() requires NEXT_PUBLIC_USE_MOCKS=true. " +
+        "Production code should use real API hooks instead.",
+    );
+  }
+  /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
+  const sel = require("@/mocks/backend/selectors") as Record<string, (...args: unknown[]) => unknown>;
+  const { projectsTable } = require("@/mocks/backend/rawData") as {
+    projectsTable: Array<Record<string, unknown>>;
+  };
+  /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
+
+  const getUser = sel.getUserById as (id: string) => User;
+  const projectsById = sel.projectsById as unknown as Map<string, unknown>;
+
+  type RawItem = Record<string, unknown>;
+
+  return projectsTable
+    .filter((p) => projectsById.has(p.id as string))
+    .map((p) => {
+      const owner = getUser(p.owner_id as string);
+      const rawMembers = (sel.getProjectMembers(p.id as string) as RawItem[])
+        .map((m) => ({
+          userId: m.user_id as string,
+          user: getUser(m.user_id as string),
+          role: m.role as ProjectMemberRole,
+          joinedAt: m.joined_at as string,
+        }))
+        .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+      return {
+        id: p.id as string,
+        name: p.name as string,
+        description: (p.description as string) ?? "",
+        ownerId: p.owner_id as string,
+        ownerName: owner.name,
+        members: rawMembers,
+        status: p.status as ProjectStatus,
+        createdAt: p.created_at as string,
+        updatedAt: p.updated_at as string,
+      };
+    });
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Paperclip, Tag, Trash2, X } from "lucide-react";
 
 import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
 import {
@@ -12,7 +12,10 @@ import { useCardComments } from "@/features/card-comments/hooks/useCardComments"
 import { useCardLabels } from "@/features/card-labels/hooks/useCardLabels";
 import { useCardAttachments } from "@/features/card-attachments/hooks/useCardAttachments";
 import { useCardActivities } from "@/features/card-activities/hooks/useCardActivities";
-import { createComment } from "@/features/card-comments/api/card-comments.api";
+import { useLabels } from "@/features/labels/hooks/useLabels";
+import { createComment, deleteComment } from "@/features/card-comments/api/card-comments.api";
+import { addLabelToCard, removeLabelFromCard } from "@/features/card-labels/api/card-labels.api";
+import { createAttachment, deleteAttachment } from "@/features/card-attachments/api/card-attachments.api";
 import { useProject } from "@/features/projects/hooks/useProject";
 import type { User } from "@/types/user";
 import UserAvatar from "../ui/UserAvatar";
@@ -29,10 +32,7 @@ function formatDateTime(dateISO: string): string {
   });
 }
 
-function resolveUser(
-  userId: string,
-  members: { user?: User }[]
-): User {
+function resolveUser(userId: string, members: { user?: User }[]): User {
   const m = members.find((x) => x.user?.id === userId);
   if (m?.user) return m.user;
   return {
@@ -60,42 +60,56 @@ export default function KanbanModal({
   onRefetch,
 }: KanbanModalProps) {
   const cardId = card ? Number(card.id) : null;
-  const { project } = useProject(projectId || null);
+  const pid = projectId || null;
+  const { project } = useProject(pid);
   const members = project?.members ?? [];
 
-  const { comments: apiComments, loading: commentsLoading, refetch: refetchComments } = useCardComments(
-    projectId || null,
-    cardId
-  );
-  const { cardLabels: apiCardLabels, loading: labelsLoading } = useCardLabels(
-    projectId || null,
-    cardId
-  );
-  const { attachments: apiAttachments, loading: attachmentsLoading } = useCardAttachments(
-    projectId || null,
-    cardId
-  );
-  const { activities: apiActivities } = useCardActivities(
-    projectId || null,
-    cardId
-  );
+  const {
+    comments: apiComments,
+    loading: commentsLoading,
+    refetch: refetchComments,
+  } = useCardComments(pid, cardId);
+  const {
+    cardLabels: apiCardLabels,
+    refetch: refetchCardLabels,
+  } = useCardLabels(pid, cardId);
+  const {
+    attachments: apiAttachments,
+    refetch: refetchAttachments,
+  } = useCardAttachments(pid, cardId);
+  const { activities: apiActivities } = useCardActivities(pid, cardId);
+  const { labels: projectLabels } = useLabels(pid);
 
   const [newCommentContent, setNewCommentContent] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [mutating, setMutating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const displayUserLabels = apiCardLabels.length > 0
-    ? apiCardLabels.map((cl) => ({
-        id: String(cl.id),
-        name: cl.label?.name ?? "—",
-        color: cl.label?.color ?? "#666",
-      }))
-    : (card?.userLabels ?? []);
+  const displayUserLabels =
+    apiCardLabels.length > 0
+      ? apiCardLabels.map((cl) => ({
+          id: String(cl.id),
+          labelId: cl.labelId,
+          name: cl.label?.name ?? "—",
+          color: cl.label?.color ?? "#666",
+        }))
+      : (card?.userLabels ?? []).map((l) => ({
+          ...l,
+          labelId: Number(l.id),
+        }));
+
+  const attachedLabelIds = new Set(apiCardLabels.map((cl) => cl.labelId));
+  const availableLabels = projectLabels.filter(
+    (l) => !attachedLabelIds.has(l.id)
+  );
 
   const displayComments = apiComments.map((c) => ({
-    id: String(c.id),
+    id: c.id,
     author: resolveUser(c.userId, members),
     body: c.content,
-    type: (c.parentCommentId != null ? "note" : "comment") as "comment" | "note",
+    type: (c.parentCommentId != null ? "note" : "comment") as
+      | "comment"
+      | "note",
     createdAt: c.createdAt,
     createdAtLabel: formatDateTime(c.createdAt),
   }));
@@ -104,37 +118,111 @@ export default function KanbanModal({
     if (!projectId || cardId == null || !newCommentContent.trim()) return;
     setCommentSubmitting(true);
     try {
-      await createComment(projectId, cardId, { content: newCommentContent.trim() });
+      await createComment(projectId, cardId, {
+        content: newCommentContent.trim(),
+      });
       setNewCommentContent("");
       await refetchComments();
       onRefetch?.();
     } catch {
-      // Could show toast
+      // silent
     } finally {
       setCommentSubmitting(false);
     }
   }, [projectId, cardId, newCommentContent, refetchComments, onRefetch]);
-  useEffect(() => {
-    if (!card) {
-      return;
-    }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
+  const handleDeleteComment = useCallback(
+    async (commentId: number) => {
+      if (!projectId || cardId == null) return;
+      setMutating(true);
+      try {
+        await deleteComment(projectId, cardId, commentId);
+        await refetchComments();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
       }
+    },
+    [projectId, cardId, refetchComments]
+  );
+
+  const handleAddLabel = useCallback(
+    async (labelId: number) => {
+      if (!projectId || cardId == null) return;
+      setMutating(true);
+      try {
+        await addLabelToCard(projectId, cardId, { labelId });
+        await refetchCardLabels();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
+      }
+    },
+    [projectId, cardId, refetchCardLabels]
+  );
+
+  const handleRemoveLabel = useCallback(
+    async (cardLabelId: number) => {
+      if (!projectId || cardId == null) return;
+      setMutating(true);
+      try {
+        await removeLabelFromCard(projectId, cardId, cardLabelId);
+        await refetchCardLabels();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
+      }
+    },
+    [projectId, cardId, refetchCardLabels]
+  );
+
+  const handleUploadAttachment = useCallback(
+    async (file: File) => {
+      if (!projectId || cardId == null) return;
+      setMutating(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        await createAttachment(projectId, cardId, formData);
+        await refetchAttachments();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
+      }
+    },
+    [projectId, cardId, refetchAttachments]
+  );
+
+  const handleDeleteAttachment = useCallback(
+    async (attachmentId: number) => {
+      if (!projectId || cardId == null) return;
+      setMutating(true);
+      try {
+        await deleteAttachment(projectId, cardId, attachmentId);
+        await refetchAttachments();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
+      }
+    },
+    [projectId, cardId, refetchAttachments]
+  );
+
+  useEffect(() => {
+    if (!card) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
     }
-
     window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [card, onClose]);
 
-  if (!card) {
-    return null;
-  }
+  if (!card) return null;
 
   return (
     <div
@@ -143,22 +231,38 @@ export default function KanbanModal({
     >
       <div
         className="af-surface-lg max-h-[90vh] w-full max-w-6xl overflow-hidden bg-[#14121a]/96"
-        onClick={(event) => event.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="grid max-h-[90vh] min-h-0 gap-0 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,0.85fr)]">
+          {/* ───── LEFT: card detail ───── */}
           <section className="min-h-0 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
             <header className="af-separator-b pb-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-3">
-                  <h2 className="text-lg font-semibold text-white">{card.title}</h2>
+                  <h2 className="text-lg font-semibold text-white">
+                    {card.title}
+                  </h2>
                   {displayUserLabels.length ? (
                     <div className="flex flex-wrap gap-1.5">
                       {displayUserLabels.map((label) => (
-                        <UserLabelBadge
+                        <button
                           key={label.id}
-                          name={label.name}
-                          color={label.color}
-                        />
+                          type="button"
+                          disabled={mutating}
+                          onClick={() =>
+                            handleRemoveLabel(Number(label.id))
+                          }
+                          className="group relative"
+                          title="Click to remove"
+                        >
+                          <UserLabelBadge
+                            name={label.name}
+                            color={label.color}
+                          />
+                          <span className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] text-white group-hover:inline-flex">
+                            ×
+                          </span>
+                        </button>
                       ))}
                     </div>
                   ) : null}
@@ -174,7 +278,10 @@ export default function KanbanModal({
                   onClick={onClose}
                   className="af-focus-ring af-accent-hover inline-flex items-center gap-2 px-2 py-2 text-sm text-white/76 transition hover:bg-white/[0.03] hover:text-[var(--accent-soft-35)]"
                 >
-                  <X className="af-accent-icon h-4 w-4" aria-hidden="true" />
+                  <X
+                    className="af-accent-icon h-4 w-4"
+                    aria-hidden="true"
+                  />
                   <span>Fechar</span>
                 </button>
               </div>
@@ -185,7 +292,9 @@ export default function KanbanModal({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
                   Descrição do card
                 </p>
-                <p className="text-sm leading-relaxed text-white/72">{card.description}</p>
+                <p className="text-sm leading-relaxed text-white/72">
+                  {card.description}
+                </p>
               </section>
 
               <section className="space-y-2">
@@ -218,9 +327,13 @@ export default function KanbanModal({
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-white">{card.title}</h3>
+                    <h3 className="text-sm font-semibold text-white">
+                      {card.title}
+                    </h3>
                   </div>
-                  <p className="af-text-tertiary mt-2 text-[11px]">{card.persona}</p>
+                  <p className="af-text-tertiary mt-2 text-[11px]">
+                    {card.persona}
+                  </p>
                   <p className="mt-3 text-sm leading-relaxed text-white/72">
                     {card.description}
                   </p>
@@ -267,7 +380,9 @@ export default function KanbanModal({
                             {task.priority}
                           </SystemBadge>
                         </div>
-                        <p className="af-text-tertiary text-[11px]">{task.assignee.name}</p>
+                        <p className="af-text-tertiary text-[11px]">
+                          {task.assignee.name}
+                        </p>
                       </div>
                       <span className="af-surface-sm inline-flex h-6 shrink-0 items-center bg-black/30 px-2 py-0 text-[10px] leading-none text-white/72">
                         {task.doneHours}h / {task.estimatedHours}h
@@ -279,13 +394,17 @@ export default function KanbanModal({
             </div>
           </section>
 
+          {/* ───── RIGHT: sidebar (comments, labels, attachments, activity) ───── */}
           <aside className="af-separator-t min-h-0 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5 lg:border-t-0 lg:border-l lg:border-white/8 lg:shadow-[inset_1px_0_0_rgba(255,255,255,0.03)]">
             <div className="space-y-4">
+              {/* Assignee / meta */}
               <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
                 <header className="af-separator-b pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-semibold text-white">Atribuição</h3>
+                      <h3 className="text-sm font-semibold text-white">
+                        Atribuição
+                      </h3>
                       <p className="af-text-secondary mt-1 text-xs">
                         Responsável e metadados
                       </p>
@@ -295,7 +414,6 @@ export default function KanbanModal({
                     </span>
                   </div>
                 </header>
-
                 <div className="af-text-secondary mt-3 space-y-2.5 text-[11px]">
                   <div className="flex items-center justify-between gap-3">
                     <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
@@ -310,21 +428,18 @@ export default function KanbanModal({
                       <span>{card.assignee.name}</span>
                     </div>
                   </div>
-
                   <div className="flex items-center justify-between gap-3">
                     <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
                       Created
                     </span>
                     <span>{card.createdAtLabel}</span>
                   </div>
-
                   <div className="flex items-center justify-between gap-3">
                     <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
                       Updated
                     </span>
                     <span>{card.updatedAtLabel}</span>
                   </div>
-
                   <div className="flex items-center justify-between gap-3">
                     <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
                       Linked
@@ -338,11 +453,73 @@ export default function KanbanModal({
                 </div>
               </section>
 
+              {/* Labels */}
+              <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
+                <header className="af-separator-b pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-white">Labels</h3>
+                    <Tag className="h-3.5 w-3.5 text-white/40" aria-hidden />
+                  </div>
+                </header>
+                <div className="mt-3 space-y-2">
+                  {displayUserLabels.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {displayUserLabels.map((label) => (
+                        <button
+                          key={label.id}
+                          type="button"
+                          disabled={mutating}
+                          onClick={() =>
+                            handleRemoveLabel(Number(label.id))
+                          }
+                          className="group relative"
+                          title="Click to remove label"
+                        >
+                          <UserLabelBadge
+                            name={label.name}
+                            color={label.color}
+                          />
+                          <span className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] text-white group-hover:inline-flex">
+                            ×
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="af-text-tertiary text-[11px]">
+                      Nenhuma label adicionada.
+                    </p>
+                  )}
+                  {availableLabels.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {availableLabels.map((label) => (
+                        <button
+                          key={label.id}
+                          type="button"
+                          disabled={mutating}
+                          onClick={() => handleAddLabel(label.id)}
+                          className="af-focus-ring inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/60 transition hover:border-white/20 hover:text-white/80 disabled:opacity-40"
+                        >
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: label.color }}
+                          />
+                          {label.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              {/* Comments */}
               <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
                 <header className="af-separator-b pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-semibold text-white">Comentários</h3>
+                      <h3 className="text-sm font-semibold text-white">
+                        Comentários
+                      </h3>
                       <p className="af-text-secondary mt-1 text-xs">
                         Discussão do item
                       </p>
@@ -354,10 +531,14 @@ export default function KanbanModal({
                 </header>
 
                 <div className="mt-3 space-y-2.5">
+                  {commentsLoading && displayComments.length === 0 ? (
+                    <p className="af-text-tertiary text-[11px]">Carregando…</p>
+                  ) : null}
+
                   {displayComments.map((comment) => (
                     <article
                       key={comment.id}
-                      className="af-surface-md bg-white/[0.03] px-3 py-3"
+                      className="group af-surface-md bg-white/[0.03] px-3 py-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-2.5">
@@ -367,25 +548,39 @@ export default function KanbanModal({
                             fallbackClassName="text-[10px] font-semibold"
                           />
                           <div className="min-w-0">
-                            <p className="text-sm text-white">{comment.author.name}</p>
+                            <p className="text-sm text-white">
+                              {comment.author.name}
+                            </p>
                             <p className="af-text-tertiary text-[11px]">
                               {comment.createdAtLabel}
                             </p>
                           </div>
                         </div>
-                        <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
-                          {comment.type}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/65">
+                            {comment.type}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={mutating}
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="af-focus-ring inline-flex h-6 w-6 items-center justify-center rounded text-white/30 opacity-0 transition hover:bg-red-500/15 hover:text-red-400 group-hover:opacity-100 disabled:opacity-30"
+                            title="Excluir comentário"
+                          >
+                            <Trash2 className="h-3 w-3" aria-hidden />
+                          </button>
+                        </div>
                       </div>
                       <p className="mt-3 text-sm leading-relaxed text-white/72">
                         {comment.body}
                       </p>
                     </article>
                   ))}
+
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      handleAddComment();
+                      void handleAddComment();
                     }}
                     className="mt-3 space-y-2"
                   >
@@ -408,27 +603,82 @@ export default function KanbanModal({
                 </div>
               </section>
 
-              {apiAttachments.length > 0 ? (
-                <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
-                  <header className="af-separator-b pb-3">
+              {/* Attachments */}
+              <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
+                <header className="af-separator-b pb-3">
+                  <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold text-white">Anexos</h3>
-                  </header>
-                  <ul className="af-text-secondary mt-3 space-y-1.5 text-xs">
-                    {apiAttachments.map((a) => (
-                      <li key={a.id}>{a.fileName}</li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
+                    <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] text-white/72">
+                      {apiAttachments.length}
+                    </span>
+                  </div>
+                </header>
+                <div className="mt-3 space-y-1.5">
+                  {apiAttachments.map((a) => (
+                    <div
+                      key={a.id}
+                      className="group flex items-center justify-between gap-2 text-xs text-white/70"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Paperclip
+                          className="h-3 w-3 shrink-0 text-white/40"
+                          aria-hidden
+                        />
+                        <span className="truncate">{a.fileName}</span>
+                        {a.fileSize ? (
+                          <span className="af-text-tertiary shrink-0 text-[10px]">
+                            ({Math.round(a.fileSize / 1024)} KB)
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={mutating}
+                        onClick={() => handleDeleteAttachment(a.id)}
+                        className="af-focus-ring inline-flex h-5 w-5 items-center justify-center rounded text-white/30 opacity-0 transition hover:text-red-400 group-hover:opacity-100 disabled:opacity-30"
+                        title="Excluir anexo"
+                      >
+                        <Trash2 className="h-3 w-3" aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="pt-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleUploadAttachment(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={mutating}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="af-focus-ring af-accent-hover inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-white/60 transition hover:text-white/80 disabled:opacity-40"
+                    >
+                      <Paperclip className="h-3 w-3" aria-hidden />
+                      Adicionar anexo
+                    </button>
+                  </div>
+                </div>
+              </section>
 
+              {/* Activity */}
               {apiActivities.length > 0 ? (
                 <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
                   <header className="af-separator-b pb-3">
-                    <h3 className="text-sm font-semibold text-white">Atividade</h3>
+                    <h3 className="text-sm font-semibold text-white">
+                      Atividade
+                    </h3>
                   </header>
                   <ul className="af-text-secondary mt-3 space-y-1.5 text-xs">
                     {apiActivities.slice(0, 10).map((a) => (
-                      <li key={a.id}>{a.description || a.activityType}</li>
+                      <li key={a.id}>
+                        {a.description || a.activityType}
+                      </li>
                     ))}
                   </ul>
                 </section>

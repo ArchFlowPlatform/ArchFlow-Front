@@ -1,6 +1,5 @@
 /**
- * Card comments API — aligns with backend CardCommentsController.
- * GET/POST/PUT/DELETE /api/projects/{projectId}/cards/{cardId}/comments
+ * Card comments API — integration plan **Step 8** (CardCommentsController).
  */
 
 import { get, post, put, del } from "@/lib/http-client";

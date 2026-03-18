@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { CardActivity } from "@/types/card";
 import { getActivities } from "../api/card-activities.api";
 
+/** Step 8: activity log for one card (read-only + create). */
 export interface UseCardActivitiesResult {
   activities: CardActivity[];
   loading: boolean;

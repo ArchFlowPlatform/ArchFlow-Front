@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { CardComment } from "@/types/card";
 import { getComments } from "../api/card-comments.api";
 
+/** Step 8: comments for one card. `refetch` after create/update/delete. */
 export interface UseCardCommentsResult {
   comments: CardComment[];
   loading: boolean;

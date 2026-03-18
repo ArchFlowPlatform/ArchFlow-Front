@@ -6,12 +6,14 @@ import { Plus } from "lucide-react";
 import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
+import InlineToast from "@/components/ui/InlineToast";
 import KanbanColumn from "@/components/kanban/KanbanColumn";
 import KanbanModal from "@/components/kanban/KanbanModal";
 import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useProject } from "../hooks/useProject";
 import { moveCard } from "@/features/board/api/board-cards.api";
+import { useToast } from "@/hooks/useToast";
 import { useKanbanBoardView } from "../hooks/useKanbanBoardView";
 import {
   buildKanbanColumns,
@@ -37,7 +39,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ title: string; body: string } | null>(null);
+  const { toast, showToast } = useToast();
   const [cardState, setCardState] = useState<KanbanBoardCardState[]>([]);
 
   const effectiveProjectId = projectId ?? "";
@@ -128,12 +130,6 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
     setDraggingCardId(null);
   }, [baseBoard]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timeoutId = window.setTimeout(() => setToast(null), 4200);
-    return () => window.clearTimeout(timeoutId);
-  }, [toast]);
-
   const handleDropCard = useCallback(
     async (cardId: string, targetColumnId: KanbanColumnId) => {
       if (!baseBoard) return;
@@ -163,7 +159,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
         targetColumn.wipLimitHours !== null &&
         nextHours > targetColumn.wipLimitHours
       ) {
-        setToast({
+        showToast({
           title: "WIP limit exceeded",
           body: `This column is limited to ${targetColumn.wipLimitHours}h. Moving this item would increase WIP to ${nextHours}h. Reduce work in progress or move it to another column.`,
         });
@@ -197,9 +193,10 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
         );
         await refetch();
       } catch {
-        setToast({
+        showToast({
           title: "Failed to move card",
           body: "Could not update the card position. Please try again.",
+          variant: "error",
         });
       } finally {
         setDraggingCardId(null);
@@ -301,18 +298,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
           />
         ) : (
           <>
-            {toast ? (
-              <div className="pointer-events-none fixed right-5 top-5 z-40 w-full max-w-sm">
-                <div className="af-surface-lg af-accent-panel bg-[#14121a]/95 px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
-                  <p className="text-sm font-semibold text-white">
-                    {toast.title}
-                  </p>
-                  <p className="af-text-secondary mt-1 text-xs leading-relaxed">
-                    {toast.body}
-                  </p>
-                </div>
-              </div>
-            ) : null}
+            <InlineToast toast={toast} />
 
             <section className="min-h-0">
               <div className="overflow-x-auto overflow-y-hidden pb-2">
@@ -351,6 +337,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
               projectId={effectiveProjectId}
               card={selectedCard}
               onClose={() => setSelectedCardId(null)}
+              onRefetch={() => void refetch()}
             />
           </>
         )

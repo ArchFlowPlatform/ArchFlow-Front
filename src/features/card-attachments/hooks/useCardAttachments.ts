@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { CardAttachment } from "@/types/card";
 import { getAttachments } from "../api/card-attachments.api";
 
+/** Step 8: attachments for one card. `refetch` after create/delete. */
 export interface UseCardAttachmentsResult {
   attachments: CardAttachment[];
   loading: boolean;

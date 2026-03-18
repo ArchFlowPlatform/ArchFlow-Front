@@ -4,6 +4,8 @@
  */
 
 import { get, post, patch } from "@/lib/http-client";
+import { safeParseArray, safeParseObject } from "@/lib/api-validation";
+import { SprintSchema } from "@/lib/schemas/api.schema";
 import type { Sprint } from "@/types/sprint";
 import type {
   CreateSprintRequest,
@@ -19,7 +21,7 @@ export async function getSprints(projectId: string): Promise<Sprint[]> {
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message ?? "Failed to fetch sprints");
   }
-  return response.data;
+  return safeParseArray<Sprint>(SprintSchema, response.data, "getSprints");
 }
 
 export async function getSprintById(
@@ -32,7 +34,7 @@ export async function getSprintById(
   if (!response.success || !response.data) {
     throw new Error(response.message ?? "Failed to fetch sprint");
   }
-  return response.data;
+  return safeParseObject<Sprint>(SprintSchema, response.data, "getSprintById");
 }
 
 export async function createSprint(

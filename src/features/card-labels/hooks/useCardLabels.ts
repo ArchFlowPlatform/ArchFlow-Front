@@ -6,6 +6,7 @@ import { getCardLabels } from "../api/card-labels.api";
 
 export type CardLabelWithLabel = CardLabel & { label?: Label };
 
+/** Step 8: labels attached to one card. `refetch` after add/remove. */
 export interface UseCardLabelsResult {
   cardLabels: CardLabelWithLabel[];
   loading: boolean;

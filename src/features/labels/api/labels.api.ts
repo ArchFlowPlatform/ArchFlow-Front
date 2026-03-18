@@ -1,6 +1,5 @@
 /**
- * Labels API — aligns with backend LabelsController.
- * GET/POST/PUT/DELETE /api/projects/{projectId}/labels
+ * Labels API — integration plan **Step 8** (LabelsController).
  */
 
 import { get, post, put, del } from "@/lib/http-client";

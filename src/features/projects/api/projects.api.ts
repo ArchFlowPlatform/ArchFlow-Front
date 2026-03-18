@@ -11,6 +11,8 @@ import {
   put,
   del,
 } from "@/lib/http-client";
+import { safeParseArray, safeParseObject } from "@/lib/api-validation";
+import { ProjectSchema, ProjectMemberSchema } from "@/lib/schemas/api.schema";
 import type {
   Project,
   ProjectMember,
@@ -30,7 +32,7 @@ export async function getProjects(): Promise<Project[]> {
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message ?? "Failed to fetch projects");
   }
-  return response.data;
+  return safeParseArray<Project>(ProjectSchema, response.data, "getProjects");
 }
 
 export async function getProjectById(id: string): Promise<Project> {
@@ -38,7 +40,7 @@ export async function getProjectById(id: string): Promise<Project> {
   if (!response.success || !response.data) {
     throw new Error(response.message ?? "Failed to fetch project");
   }
-  return response.data;
+  return safeParseObject(ProjectSchema, response.data, "getProjectById");
 }
 
 export async function createProject(
@@ -89,7 +91,7 @@ export async function getMembers(projectId: string): Promise<ProjectMember[]> {
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message ?? "Failed to fetch members");
   }
-  return response.data;
+  return safeParseArray<ProjectMember>(ProjectMemberSchema, response.data, "getMembers");
 }
 
 export async function addMember(

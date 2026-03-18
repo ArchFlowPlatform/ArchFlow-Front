@@ -1,6 +1,5 @@
 /**
- * Card labels API — aligns with backend CardLabelsController.
- * GET/POST/DELETE /api/projects/{projectId}/cards/{cardId}/labels
+ * Card labels API — integration plan **Step 8** (CardLabelsController).
  */
 
 import { get, post, del } from "@/lib/http-client";

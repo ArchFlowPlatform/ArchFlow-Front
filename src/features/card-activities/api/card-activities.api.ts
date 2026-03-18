@@ -1,6 +1,5 @@
 /**
- * Card activities API — aligns with backend CardActivitiesController.
- * GET/POST /api/projects/{projectId}/cards/{cardId}/activities
+ * Card activities API — integration plan **Step 8** (CardActivitiesController).
  */
 
 import { get, post } from "@/lib/http-client";

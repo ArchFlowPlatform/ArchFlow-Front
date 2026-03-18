@@ -4,6 +4,8 @@
  */
 
 import { get, post, patch, del } from "@/lib/http-client";
+import { safeParseArray } from "@/lib/api-validation";
+import { BoardCardSchema } from "@/lib/schemas/api.schema";
 import type { BoardCard } from "@/types/board";
 import type {
   CreateBoardCardRequest,
@@ -30,7 +32,7 @@ export async function getCards(
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message ?? "Failed to fetch cards");
   }
-  return response.data;
+  return safeParseArray<BoardCard>(BoardCardSchema, response.data, "getCards");
 }
 
 export async function createCard(

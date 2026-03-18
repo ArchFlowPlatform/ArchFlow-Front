@@ -1,7 +1,6 @@
 /**
- * Card attachments API — aligns with backend CardAttachmentsController.
- * GET/POST/DELETE /api/projects/{projectId}/cards/{cardId}/attachments
- * POST uses multipart/form-data for file upload.
+ * Card attachments API — integration plan **Step 8** (CardAttachmentsController).
+ * POST uses `multipart/form-data` (file upload).
  */
 
 import { get, del } from "@/lib/http-client";

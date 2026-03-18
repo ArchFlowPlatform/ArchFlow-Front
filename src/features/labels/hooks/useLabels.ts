@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Label } from "@/types/card";
 import { getLabels } from "../api/labels.api";
 
+/** Step 8: project-level labels. Use `refetch` after create/update/delete. */
 export interface UseLabelsResult {
   labels: Label[];
   loading: boolean;

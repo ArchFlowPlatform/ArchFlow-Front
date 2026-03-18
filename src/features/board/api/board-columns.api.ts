@@ -3,6 +3,8 @@
  */
 
 import { get, post, put, del } from "@/lib/http-client";
+import { safeParseArray } from "@/lib/api-validation";
+import { BoardColumnSchema } from "@/lib/schemas/api.schema";
 import type { BoardColumn } from "@/types/board";
 import type {
   CreateBoardColumnRequest,
@@ -21,7 +23,7 @@ export async function getColumns(
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message ?? "Failed to fetch columns");
   }
-  return response.data;
+  return safeParseArray<BoardColumn>(BoardColumnSchema, response.data, "getColumns");
 }
 
 export async function createColumn(
