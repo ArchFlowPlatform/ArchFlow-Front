@@ -1,6 +1,5 @@
 /**
- * Board API — aligns with backend BoardsController.
- * GET/PATCH /api/projects/{projectId}/sprints/{sprintId}/board
+ * Board API — integration plan **Step 7** (BoardsController).
  */
 
 import { get, patch } from "@/lib/http-client";

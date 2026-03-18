@@ -2,7 +2,7 @@
  * Project, ProjectMember, ProjectInvite entities aligned with backend API.
  */
 
-import type { MemberRole, ProjectStatus } from "./enums";
+import type { InviteStatus, MemberRole, ProjectStatus } from "./enums";
 import type { User } from "./user";
 
 export interface Project {
@@ -40,5 +40,5 @@ export interface ProjectInvite {
   token: string;
   expiresAt: string;
   createdAt: string;
-  status: string;
+  status: InviteStatus;
 }

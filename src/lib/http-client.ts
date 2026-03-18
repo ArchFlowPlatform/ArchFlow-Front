@@ -19,12 +19,18 @@ function isPublicRoute(pathname: string): boolean {
 
 /**
  * HTTP client for API communication.
- * Authentication uses httpOnly cookies — no manual token handling.
- * - Requests include cookies via withCredentials: true.
- * - Response: on 401, redirects to sign-in (except on public routes to prevent loop).
+ * Integration plan Step 1 (HTTP client + auth), adapted for **httpOnly cookies**:
+ * - No `Authorization: Bearer` header; session is sent via `withCredentials: true`.
+ * - **401 on GET /auth/me:** do not redirect — caller treats as anonymous (landing, etc.).
+ * - **401 on other routes:** redirect to `/signin` when not already on a public route.
  *
- * Backend must set Access-Control-Allow-Credentials: true for cookies to work.
+ * Backend must set `Access-Control-Allow-Credentials: true` for cookies to work.
  */
+function isAuthMeRequest(config: { url?: string }): boolean {
+  const path = config.url ?? "";
+  return path.includes("/auth/me");
+}
+
 function createHttpClient(): AxiosInstance {
   const client = axios.create({
     baseURL: DEFAULT_BASE_URL,
@@ -39,6 +45,9 @@ function createHttpClient(): AxiosInstance {
     (response) => response,
     (error) => {
       if (error.response?.status === 401 && typeof window !== "undefined") {
+        if (error.config && isAuthMeRequest(error.config)) {
+          return Promise.reject(error);
+        }
         const pathname = window.location.pathname;
         if (!isPublicRoute(pathname)) {
           window.location.href = SIGN_IN_PATH;

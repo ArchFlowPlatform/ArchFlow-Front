@@ -69,8 +69,8 @@ export interface UseKanbanBoardViewResult {
 }
 
 /**
- * Aggregated hook: fetches board columns, cards per column, backlog (epic/story), project (assignees).
- * Builds KanbanBoardViewModel for KanbanPage.
+ * Step 7: `useBoardColumns` + `getCards` per column (same contract as `useBoardCards` per column).
+ * After DnD, call `refetch()` so columns + card positions stay in sync with the API.
  */
 export function useKanbanBoardView(
   projectId: string | null,
@@ -84,6 +84,8 @@ export function useKanbanBoardView(
   const { backlog } = useBacklog(projectId);
   const { project } = useProject(projectId);
   const [cardsByColumnId, setCardsByColumnId] = useState<Record<number, BoardCard[]>>({});
+  const [cardsLoading, setCardsLoading] = useState(false);
+  const [cardsError, setCardsError] = useState<Error | null>(null);
 
   const members = project?.members ?? [];
   const epics = backlog?.epics ?? [];
@@ -94,38 +96,68 @@ export function useKanbanBoardView(
     async (colIds: number[]) => {
       if (!projectId || !sprintId || colIds.length === 0) {
         setCardsByColumnId({});
+        setCardsLoading(false);
+        setCardsError(null);
         return;
       }
+      setCardsLoading(true);
+      setCardsError(null);
       try {
         const results = await Promise.all(
-          colIds.map((cid) => getCards(projectId, sprintId, cid).then((cards) => ({ columnId: cid, cards })))
+          colIds.map((cid) =>
+            getCards(projectId, sprintId, cid).then((cards) => ({
+              columnId: cid,
+              cards,
+            }))
+          )
         );
         const map: Record<number, BoardCard[]> = {};
         for (const { columnId, cards } of results) map[columnId] = cards;
         setCardsByColumnId(map);
-      } catch {
+      } catch (e) {
         setCardsByColumnId({});
+        setCardsError(e instanceof Error ? e : new Error(String(e)));
+      } finally {
+        setCardsLoading(false);
       }
     },
     [projectId, sprintId]
   );
 
   useEffect(() => {
-    if (columns.length > 0) {
-      fetchCardsForColumns(columns.map((c) => c.id));
+    if (!projectId || !sprintId) {
+      setCardsByColumnId({});
+      setCardsLoading(false);
+      setCardsError(null);
+      return;
+    }
+    const ids = columns.map((c) => c.id);
+    if (ids.length === 0) {
+      setCardsByColumnId({});
+      setCardsLoading(false);
+      setCardsError(null);
+      return;
+    }
+    void fetchCardsForColumns(ids);
+  }, [projectId, sprintId, columns, fetchCardsForColumns]);
+
+  const refetch = useCallback(async () => {
+    const cols = await refetchCols();
+    if (cols.length > 0) {
+      await fetchCardsForColumns(cols.map((c) => c.id));
     } else {
       setCardsByColumnId({});
+      setCardsError(null);
     }
-  }, [columns, fetchCardsForColumns]);
+  }, [refetchCols, fetchCardsForColumns]);
 
-  const refetch = useCallback(() => refetchCols(), [refetchCols]);
-
-  const loading = colsLoading;
-  const error = colsError;
+  const loading = colsLoading || cardsLoading;
+  const error = colsError ?? cardsError;
 
   const view = useMemo<KanbanBoardViewModel | null>(() => {
     if (!sprint || !projectId || !sprintId) return null;
-    if (colsLoading || error) return null;
+    if (colsLoading || cardsLoading) return null;
+    if (colsError || cardsError) return null;
 
     const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
     const allCards: KanbanCardView[] = [];
@@ -225,7 +257,9 @@ export function useKanbanBoardView(
     cardsByColumnId,
     sprint,
     colsLoading,
-    error,
+    cardsLoading,
+    colsError,
+    cardsError,
     epics,
     members,
     projectId,

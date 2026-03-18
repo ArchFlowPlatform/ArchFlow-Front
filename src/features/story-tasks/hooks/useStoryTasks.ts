@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { StoryTask } from "@/types/sprint";
 import { getTasks } from "../api/story-tasks.api";
 
+/** Step 6: tasks for one sprint item; `refetch` after mutations. */
 export interface UseStoryTasksResult {
   tasks: StoryTask[];
   loading: boolean;

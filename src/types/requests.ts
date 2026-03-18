@@ -3,7 +3,16 @@
  * Align with backend DTOs when documented. Used by API modules (Step 3+).
  */
 
-import type { MemberRole } from "./enums";
+import type { MemberRole, ProjectStatus, UserType } from "./enums";
+
+// ----- Users (POST /api/users) — plan §2.2 -----
+
+export interface CreateUserRequest {
+  email: string;
+  name: string;
+  password: string;
+  type?: UserType;
+}
 
 // ----- Projects -----
 
@@ -15,7 +24,7 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
-  status?: string;
+  status?: ProjectStatus;
 }
 
 export interface AddMemberRequest {

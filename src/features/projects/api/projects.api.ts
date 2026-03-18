@@ -1,6 +1,8 @@
 /**
- * Projects API — aligns with backend ProjectsController.
- * GET/POST /api/projects, members, invites.
+ * Projects API — integration plan **Step 3** (ProjectsController).
+ * All calls use `@/lib/http-client` (cookie session).
+ *
+ * Covers: list/get/create/update, archive/restore, members, invites (accept/decline/revoke).
  */
 
 import {

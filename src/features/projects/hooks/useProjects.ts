@@ -12,9 +12,8 @@ export interface UseProjectsResult {
 }
 
 /**
- * Fetches all projects and enriches each with owner + members (ProjectWithDetails).
- * Owner is derived from the member with role "owner"; if missing, owner is left undefined
- * and we extend the project with a placeholder for UI compatibility.
+ * Step 3: `getProjects()` + per-project `getMembers()` → `ProjectWithDetails[]`.
+ * Caching via in-hook state + `refetch` (no extra deps).
  */
 async function enrichProjectsWithDetails(
   projects: Awaited<ReturnType<typeof getProjects>>

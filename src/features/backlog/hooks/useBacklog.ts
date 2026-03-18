@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { ProductBacklog } from "@/types/backlog";
 import { getBacklog } from "../api/backlog.api";
 
+/** Step 4: `getBacklog(projectId)`; use `refetch` after mutations. */
 export interface UseBacklogResult {
   backlog: ProductBacklog | null;
   loading: boolean;

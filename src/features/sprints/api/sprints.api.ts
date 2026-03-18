@@ -1,6 +1,6 @@
 /**
- * Sprints API — aligns with backend SprintsController.
- * GET/POST/PATCH /api/projects/{projectId}/sprints, activate, close, cancel, archive, restore.
+ * Sprints API — integration plan **Step 5** (SprintsController).
+ * List/detail CRUD + activate, close, cancel, archive, restore.
  */
 
 import { get, post, patch } from "@/lib/http-client";

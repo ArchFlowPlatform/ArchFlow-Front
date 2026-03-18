@@ -47,6 +47,8 @@ export interface Task {
 
 export interface StoryTaskRowView {
   id: string;
+  /** Backend task id for DELETE / tasks API. */
+  numericTaskId: number;
   userStoryId: string;
   title: string;
   description: string;
@@ -58,6 +60,8 @@ export interface StoryTaskRowView {
 
 export interface SprintBacklogStoryView {
   id: string;
+  /** Sprint item row id for sprint-items API. */
+  sprintItemId: number;
   title: string;
   epicName: string;
   acceptanceCriteria: string;
@@ -157,9 +161,11 @@ export function buildSprintBacklogView(
 
   const taskViewsByStoryId = new Map<string, StoryTaskRowView[]>();
 
+  let mockTaskNumericId = 1;
   for (const task of sprintTasks) {
     const taskView: StoryTaskRowView = {
       id: task.id,
+      numericTaskId: mockTaskNumericId++,
       userStoryId: task.userStoryId,
       title: task.title,
       description: task.description,
@@ -174,6 +180,7 @@ export function buildSprintBacklogView(
     taskViewsByStoryId.set(task.userStoryId, currentList);
   }
 
+  let mockSprintItemNumericId = 1;
   const stories = sprintItems
     .map((item) => {
       const story = getUserStoryRowById(item.userStoryId);
@@ -186,6 +193,7 @@ export function buildSprintBacklogView(
 
       return {
         id: story.id,
+        sprintItemId: mockSprintItemNumericId++,
         title: story.title,
         epicName: epic.name,
         acceptanceCriteria: story.acceptance_criteria ?? "",

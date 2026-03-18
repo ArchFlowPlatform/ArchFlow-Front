@@ -1,6 +1,6 @@
 /**
- * Board cards API — aligns with backend BoardCardsController.
- * GET/POST/PATCH/DELETE .../board/columns/{columnId}/cards
+ * Board cards API — integration plan **Step 7** (BoardCardsController).
+ * Drag between columns → `moveCard`; same column order → `reorderCard`.
  */
 
 import { get, post, patch, del } from "@/lib/http-client";

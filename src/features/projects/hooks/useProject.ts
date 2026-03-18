@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { ProjectWithDetails } from "@/types/project";
 import { getProjectById, getMembers } from "../api/projects.api";
 
+/** Step 3: `getProjectById` + `getMembers` for project-scoped pages / shell. */
 export interface UseProjectResult {
   project: ProjectWithDetails | null;
   loading: boolean;
@@ -43,7 +44,6 @@ export function useProject(projectId: string | null): UseProjectResult {
     setError(null);
     try {
       const data = await getProjectById(projectId);
-      console.log("data", data);
       const enriched = await enrichProjectWithDetails(data);
       setProject(enriched);
     } catch (e) {

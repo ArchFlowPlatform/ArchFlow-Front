@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { SprintItem } from "@/types/sprint";
 import { getSprintItems } from "../api/sprint-items.api";
 
+/** Step 6: list sprint items; `refetch` after POST/PATCH/DELETE. */
 export interface UseSprintItemsResult {
   items: SprintItem[];
   loading: boolean;

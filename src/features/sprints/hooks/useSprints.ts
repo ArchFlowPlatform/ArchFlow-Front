@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Sprint } from "@/types/sprint";
 import { getSprints } from "../api/sprints.api";
 
+/** Step 5: `getSprints(projectId)`; call `refetch` after create/update/activate. */
 export interface UseSprintsResult {
   sprints: Sprint[];
   loading: boolean;

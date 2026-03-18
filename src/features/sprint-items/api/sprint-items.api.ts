@@ -1,6 +1,5 @@
 /**
- * Sprint items API — aligns with backend SprintItemsController.
- * GET/POST/PATCH/DELETE /api/projects/{projectId}/sprints/{sprintId}/items
+ * Sprint items API — integration plan **Step 6** (SprintItemsController).
  */
 
 import { get, post, patch, del } from "@/lib/http-client";

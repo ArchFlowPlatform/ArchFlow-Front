@@ -11,6 +11,7 @@ import KanbanModal from "@/components/kanban/KanbanModal";
 import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useProject } from "../hooks/useProject";
+import { moveCard } from "@/features/board/api/board-cards.api";
 import { useKanbanBoardView } from "../hooks/useKanbanBoardView";
 import {
   buildKanbanColumns,
@@ -54,7 +55,6 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
   const placeholderUser = authUserToUser(user) ?? { id: "", name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" };
   const projectName = project?.name ?? "…";
   const projectOwnerName = project?.ownerName ?? "—";
-  console.log("projectOwnerName", project?.ownerName);
   const projectBadgeLabel = project ? String(project.members.length) : "0";
 
   const baseBoard = view ?? null;
@@ -188,9 +188,6 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       }
 
       try {
-        const { moveCard } = await import(
-          "@/features/board/api/board-cards.api"
-        );
         await moveCard(
           effectiveProjectId,
           selectedSprintId,
@@ -272,6 +269,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
             title="Failed to load board."
             description={error?.message ?? "Unknown error"}
             actionLabel="Retry"
+            onAction={() => void refetch()}
           />
         }
       />

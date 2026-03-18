@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Sprint } from "@/types/sprint";
 import type { UserStory } from "@/types/backlog";
 import type { User } from "@/types/user";
@@ -63,11 +63,12 @@ export interface UseSprintBacklogViewResult {
   loading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
+  /** Backlog stories not yet in this sprint (for POST item). */
+  availableBacklogStories: UserStory[];
 }
 
 /**
- * Aggregated hook that fetches sprint items, tasks per item, backlog (for epic names),
- * and project (for assignee resolution). Builds SprintBacklogViewModel.
+ * Step 6: `useSprintItems` + `getTasks` per item + backlog/project for labels/assignees.
  */
 export function useSprintBacklogView(
   projectId: string | null,
@@ -75,11 +76,12 @@ export function useSprintBacklogView(
   sprint: Sprint | null
 ): UseSprintBacklogViewResult {
   const { items, loading: itemsLoading, error: itemsError, refetch: refetchItems } = useSprintItems(projectId, sprintId);
-  const { backlog } = useBacklog(projectId);
+  const { backlog, loading: backlogLoading } = useBacklog(projectId);
   const { project } = useProject(projectId);
 
   const [tasksByItemId, setTasksByItemId] = useState<Record<number, import("@/types/sprint").StoryTask[]>>({});
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [tasksError, setTasksError] = useState<Error | null>(null);
 
   const members = project?.members ?? [];
   const epics = backlog?.epics ?? [];
@@ -93,6 +95,7 @@ export function useSprintBacklogView(
         return;
       }
       setTasksLoading(true);
+      setTasksError(null);
       try {
         const results = await Promise.all(
           itemIds.map((itemId) =>
@@ -104,8 +107,9 @@ export function useSprintBacklogView(
           map[itemId] = tasks;
         }
         setTasksByItemId(map);
-      } catch {
+      } catch (e) {
         setTasksByItemId({});
+        setTasksError(e instanceof Error ? e : new Error(String(e)));
       } finally {
         setTasksLoading(false);
       }
@@ -125,10 +129,25 @@ export function useSprintBacklogView(
     await refetchItems();
   }, [refetchItems]);
 
+  const availableBacklogStories = useMemo(() => {
+    if (itemsLoading || itemsError || backlogLoading || !backlog) return [];
+    const inSprint = new Set(items.map((i) => i.userStoryId));
+    return allBacklogStories.filter(
+      (s) => !inSprint.has(s.id) && !s.isArchived
+    );
+  }, [
+    items,
+    allBacklogStories,
+    itemsLoading,
+    itemsError,
+    backlog,
+    backlogLoading,
+  ]);
+
   const view: SprintBacklogViewModel | null = (() => {
     if (!sprint || !projectId || !sprintId) return null;
     if (itemsLoading || tasksLoading) return null;
-    if (itemsError) return null;
+    if (itemsError || tasksError) return null;
 
     const stories: SprintBacklogStoryView[] = items
       .map((item) => {
@@ -141,6 +160,7 @@ export function useSprintBacklogView(
           .sort((a, b) => a.position - b.position || a.id - b.id)
           .map((task) => ({
             id: String(task.id),
+            numericTaskId: task.id,
             userStoryId: String(userStory.id),
             title: task.title,
             description: task.description ?? "",
@@ -156,6 +176,7 @@ export function useSprintBacklogView(
         );
         return {
           id: String(userStory.id),
+          sprintItemId: item.id,
           title: userStory.title,
           epicName,
           acceptanceCriteria: userStory.acceptanceCriteria ?? "",
@@ -240,7 +261,8 @@ export function useSprintBacklogView(
   return {
     view,
     loading: itemsLoading || tasksLoading,
-    error: itemsError,
+    error: itemsError ?? tasksError,
     refetch,
+    availableBacklogStories,
   };
 }

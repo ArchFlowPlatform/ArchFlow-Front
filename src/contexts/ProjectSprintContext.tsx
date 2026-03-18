@@ -28,6 +28,8 @@ export interface UseProjectSprintResult {
   setSelectedSprintId: (sprintId: string) => void;
   loading: boolean;
   error: Error | null;
+  /** Reload sprint list from API (after create/update/mutations). */
+  refetchSprints: () => Promise<void>;
 }
 
 const STORAGE_KEY = "archflow:selected-sprint-by-project";
@@ -60,6 +62,9 @@ function getDefaultSprintId(sprints: Sprint[]): string | null {
   return sprints[0]?.id ?? null;
 }
 
+/**
+ * Step 5: selection map in **sessionStorage**. Children use `useProjectSprint` → API sprints via `useSprints`.
+ */
 export function ProjectSprintProvider({ children }: { children: ReactNode }) {
   const [selectedSprintIdByProject, setSelectedSprintIdByProject] = useState<
     Record<string, string>
@@ -98,6 +103,9 @@ export function ProjectSprintProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Step 5: `useSprints` + persisted selection; invalid stored id → active sprint, else first.
+ */
 export function useProjectSprint(projectId: string): UseProjectSprintResult {
   const context = useContext(ProjectSprintContext);
 
@@ -105,7 +113,9 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
     throw new Error("useProjectSprint must be used within ProjectSprintProvider.");
   }
 
-  const { sprints, loading, error } = useSprints(projectId || null);
+  const { sprints, loading, error, refetch: refetchSprints } = useSprints(
+    projectId || null,
+  );
   const storedSprintId = context.selectedSprintIdByProject[projectId];
   const selectedSprintId = useMemo(() => {
     if (storedSprintId && sprints.some((s) => s.id === storedSprintId)) {
@@ -146,5 +156,6 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
     },
     loading,
     error,
+    refetchSprints,
   };
 }

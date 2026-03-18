@@ -8,7 +8,8 @@ export interface UseBoardColumnsResult {
   columns: BoardColumn[];
   loading: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
+  /** Refetch columns; returns latest column list (for chaining card refetch). */
+  refetch: () => Promise<BoardColumn[]>;
 }
 
 export function useBoardColumns(
@@ -19,21 +20,23 @@ export function useBoardColumns(
   const [loading, setLoading] = useState(Boolean(projectId && sprintId));
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchColumns = useCallback(async () => {
+  const fetchColumns = useCallback(async (): Promise<BoardColumn[]> => {
     if (!projectId || !sprintId) {
       setColumns([]);
       setLoading(false);
       setError(null);
-      return;
+      return [];
     }
     setLoading(true);
     setError(null);
     try {
       const data = await getColumns(projectId, sprintId);
       setColumns(data);
+      return data;
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setColumns([]);
+      return [];
     } finally {
       setLoading(false);
     }

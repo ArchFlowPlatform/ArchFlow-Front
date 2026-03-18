@@ -1,5 +1,5 @@
 /**
- * Domain enums aligned with backend API.
+ * Domain enums aligned with backend API (FRONTEND_BACKEND_INTEGRATION_PLAN §2.1).
  * Used by entity interfaces and request/response types.
  */
 

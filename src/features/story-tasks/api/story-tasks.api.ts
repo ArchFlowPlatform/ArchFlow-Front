@@ -1,6 +1,5 @@
 /**
- * Story tasks API — aligns with backend StoryTasksController.
- * GET/POST/PUT/DELETE/PATCH /api/projects/{projectId}/sprints/{sprintId}/items/{sprintItemId}/tasks.
+ * Story tasks API — integration plan **Step 6** (StoryTasksController).
  */
 
 import { get, post, put, del, patch } from "@/lib/http-client";

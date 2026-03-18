@@ -12,7 +12,8 @@ export interface UseEpicsResult {
 }
 
 /**
- * Returns epics for a project. Data comes from useBacklog(projectId).
+ * Step 4: epics slice of backlog (same fetch as `useBacklog` — prefer one
+ * `useBacklog` per page if you also need stories to avoid duplicate requests).
  */
 export function useEpics(projectId: string | null): UseEpicsResult {
   const { backlog, loading, error, refetch } = useBacklog(projectId);

@@ -377,7 +377,8 @@ export default function ProductBacklogPage({
                                                 Acceptance Criteria
                                               </p>
                                               <p className="af-text-secondary mt-1 whitespace-pre-line text-xs leading-relaxed">
-                                                {story.acceptanceCriteria}
+                                                {getAcceptanceCriteriaValue(story) ||
+                                                  "—"}
                                               </p>
                                             </div>
 

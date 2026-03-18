@@ -1,6 +1,6 @@
 /**
- * Backlog API — aligns with backend BacklogController.
- * GET/PATCH /api/projects/{projectId}/backlog, epics, stories.
+ * Backlog API — integration plan **Step 4** (BacklogController).
+ * Epics/stories CRUD + reorder/move/archive/restore via `@/lib/http-client`.
  */
 
 import { get, post, patch } from "@/lib/http-client";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
@@ -9,6 +9,8 @@ import StorySprintCard from "@/components/sprint-backlog/StorySprintCard";
 import WorkloadPanel from "@/components/sprint-backlog/WorkloadPanel";
 import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { createSprintItem, deleteSprintItem } from "@/features/sprint-items/api/sprint-items.api";
+import { createTask, deleteTask } from "@/features/story-tasks/api/story-tasks.api";
 import { useProject } from "../hooks/useProject";
 import { useSprintBacklogView } from "../hooks/useSprintBacklogView";
 import type {
@@ -42,6 +44,8 @@ export default function SprintBacklogPage({
   projectId,
 }: SprintBacklogPageProps) {
   const [query, setQuery] = useState("");
+  const [mutating, setMutating] = useState(false);
+  const [addStoryId, setAddStoryId] = useState("");
 
   const effectiveProjectId = projectId ?? "";
   const { user } = useAuth();
@@ -49,10 +53,26 @@ export default function SprintBacklogPage({
   const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
     effectiveProjectId || ""
   );
-  const { view, loading, error } = useSprintBacklogView(
-    effectiveProjectId || null,
-    selectedSprintId,
-    selectedSprint
+  const { view, loading, error, refetch, availableBacklogStories } =
+    useSprintBacklogView(
+      effectiveProjectId || null,
+      selectedSprintId,
+      selectedSprint
+    );
+
+  const runWithRefetch = useCallback(
+    async (action: () => Promise<void>) => {
+      setMutating(true);
+      try {
+        await action();
+        await refetch();
+      } catch (e) {
+        globalThis.alert(e instanceof Error ? e.message : String(e));
+      } finally {
+        setMutating(false);
+      }
+    },
+    [refetch]
   );
 
   const placeholderUser = authUserToUser(user) ?? { id: "", name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" };
@@ -231,6 +251,7 @@ export default function SprintBacklogPage({
             title="Failed to load sprint backlog."
             description={error.message}
             actionLabel="Try again"
+            onAction={() => void refetch()}
           />
         }
       />
@@ -274,38 +295,115 @@ export default function SprintBacklogPage({
       searchValue={query}
       onSearchChange={setQuery}
       mainColumn={
-        stories.length === 0 ? (
-          <ProjectEmptyState
-            title="No items in this sprint."
-            description="This sprint has not received any backlog items yet. Add stories to start planning work."
-            actionLabel="Add item to sprint"
-          />
-        ) : (
-          <section className="af-surface-lg bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
-            <header className="af-separator-b pb-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-white">
-                    User Stories na Sprint
-                  </h2>
-                  <p className="af-text-secondary mt-1 text-xs">
-                    Itens planejados para entrega em {periodLabel}.
-                  </p>
-                </div>
-
-                <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/72">
-                  {filteredStories.length} stories
+        <>
+          {selectedSprintId && availableBacklogStories.length > 0 ? (
+            <div className="af-surface-lg mb-4 flex flex-wrap items-end gap-3 bg-[#14121a]/70 px-4 py-3 sm:px-5">
+              <label className="min-w-[14rem] flex-1">
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                  Adicionar user story à sprint
                 </span>
-              </div>
-            </header>
-
-            <div className="mt-3 space-y-3">
-              {filteredStories.map((story) => (
-                <StorySprintCard key={story.id} story={story} />
-              ))}
+                <select
+                  value={addStoryId}
+                  onChange={(e) => setAddStoryId(e.target.value)}
+                  disabled={mutating}
+                  className="af-focus-ring w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
+                >
+                  <option value="">Selecione…</option>
+                  {availableBacklogStories.map((s) => (
+                    <option key={s.id} value={String(s.id)}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={mutating || !addStoryId}
+                onClick={() =>
+                  runWithRefetch(async () => {
+                    await createSprintItem(effectiveProjectId, selectedSprintId, {
+                      userStoryId: Number(addStoryId),
+                    });
+                    setAddStoryId("");
+                  })
+                }
+                className="af-surface-md af-focus-ring af-accent-hover shrink-0 px-4 py-2 text-xs font-medium text-white/90"
+              >
+                Adicionar à sprint
+              </button>
             </div>
-          </section>
-        )
+          ) : null}
+
+          {stories.length === 0 ? (
+            <ProjectEmptyState
+              title="No items in this sprint."
+              description={
+                availableBacklogStories.length > 0
+                  ? "Use o seletor acima para adicionar user stories do backlog a esta sprint."
+                  : "This sprint has not received any backlog items yet. Add stories in the product backlog, then add them here."
+              }
+              actionLabel="Add item to sprint"
+            />
+          ) : (
+            <section className="af-surface-lg bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
+              <header className="af-separator-b pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-white">
+                      User Stories na Sprint
+                    </h2>
+                    <p className="af-text-secondary mt-1 text-xs">
+                      Itens planejados para entrega em {periodLabel}.
+                    </p>
+                  </div>
+
+                  <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/72">
+                    {filteredStories.length} stories
+                  </span>
+                </div>
+              </header>
+
+              <div className="mt-3 space-y-3">
+                {filteredStories.map((story) => (
+                  <StorySprintCard
+                    key={story.sprintItemId}
+                    story={story}
+                    mutating={mutating}
+                    onRemoveFromSprint={(sprintItemId) =>
+                      runWithRefetch(async () => {
+                        await deleteSprintItem(
+                          effectiveProjectId,
+                          selectedSprintId!,
+                          sprintItemId
+                        );
+                      })
+                    }
+                    onCreateTask={(sprintItemId, title) =>
+                      runWithRefetch(async () => {
+                        await createTask(
+                          effectiveProjectId,
+                          selectedSprintId!,
+                          sprintItemId,
+                          { title }
+                        );
+                      })
+                    }
+                    onDeleteTask={(sprintItemId, taskId) =>
+                      runWithRefetch(async () => {
+                        await deleteTask(
+                          effectiveProjectId,
+                          selectedSprintId!,
+                          sprintItemId,
+                          taskId
+                        );
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       }
       sideColumn={
         stories.length === 0 ? undefined : (

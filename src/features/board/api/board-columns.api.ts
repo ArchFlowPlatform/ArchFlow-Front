@@ -1,6 +1,5 @@
 /**
- * Board columns API — aligns with backend BoardColumnsController.
- * GET/POST/PUT/DELETE /api/projects/{projectId}/sprints/{sprintId}/board/columns
+ * Board columns API — integration plan **Step 7** (BoardColumnsController).
  */
 
 import { get, post, put, del } from "@/lib/http-client";

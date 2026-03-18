@@ -12,8 +12,7 @@ export interface UseStoriesResult {
 }
 
 /**
- * Returns user stories for an epic. Data comes from useBacklog(projectId);
- * when epicId is provided, returns that epic's userStories; otherwise all stories.
+ * Step 4: stories from backlog; `epicId` filters to one epic. Shares fetch with `useBacklog`.
  */
 export function useStories(
   projectId: string | null,

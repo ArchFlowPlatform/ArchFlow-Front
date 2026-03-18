@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Board } from "@/types/board";
 import { getBoard } from "../api/board.api";
 
+/** Step 7: board metadata (GET/PATCH). */
 export interface UseBoardResult {
   board: Board | null;
   loading: boolean;

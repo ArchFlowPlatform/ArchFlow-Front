@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { BoardCard } from "@/types/board";
 import { getCards } from "../api/board-cards.api";
 
+/** Step 7: cards in one column; `refetch` after create/move/reorder/delete. */
 export interface UseBoardCardsResult {
   cards: BoardCard[];
   loading: boolean;
