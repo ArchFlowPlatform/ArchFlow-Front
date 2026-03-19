@@ -94,6 +94,10 @@ export default function CreateEpicModal({
     onClose();
   }, [submitting, onClose]);
 
+  const nameInputCls = errors.name
+    ? inputCls + " border-red-400/70 focus:border-red-400/70"
+    : inputCls;
+
   return (
     <ModalShell
       open={open}
@@ -144,7 +148,7 @@ export default function CreateEpicModal({
               placeholder="Ex: Autenticação de usuários"
               autoFocus
               disabled={submitting}
-              className={inputCls}
+              className={nameInputCls}
             />
             {errors.name && <p className={errCls}>{errors.name}</p>}
           </label>

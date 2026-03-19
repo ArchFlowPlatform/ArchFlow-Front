@@ -127,17 +127,28 @@ export default function ProductBacklogPage({
   );
 
   const members = project?.members ?? [];
-  const memberOptions = useMemo(
+  const memberOptionsLegacy = useMemo(
     () =>
       members.map((m) => ({
         userId: m.userId ?? m.user?.id ?? "",
-        name: m.user?.name ?? "Membro",
+        name: m.user?.name ?? "—",
       })),
     [members],
   );
 
   const [resolvedAssigneesById, setResolvedAssigneesById] = useState<Record<string, User>>({});
   const [assigneesLoading, setAssigneesLoading] = useState(false);
+
+  const memberOptions = useMemo(
+    () =>
+      memberOptionsLegacy
+        .map((m) => ({
+          ...m,
+          name: resolvedAssigneesById[m.userId]?.name ?? m.name,
+        }))
+        .filter((m) => Boolean(m.userId?.trim())),
+    [memberOptionsLegacy, resolvedAssigneesById],
+  );
   const placeholderUser = authUserToUser(user) ?? {
     id: "",
     name: "—",
@@ -159,14 +170,20 @@ export default function ProductBacklogPage({
   );
 
   const assigneeIdsToResolve = useMemo(() => {
-    return Array.from(
-      new Set(
-        allStories
-          .map((s) => s.assigneeId)
-          .filter((id): id is string => Boolean(id && id.trim())),
-      ),
-    );
-  }, [allStories]);
+    const ids = new Set<string>();
+
+    for (const member of members) {
+      const id = member.userId ?? member.user?.id ?? "";
+      if (id.trim()) ids.add(id);
+    }
+
+    for (const story of allStories) {
+      const id = story.assigneeId;
+      if (id?.trim()) ids.add(id);
+    }
+
+    return Array.from(ids);
+  }, [allStories, members]);
 
   const assigneeIdsKey = useMemo(() => {
     return [...assigneeIdsToResolve].sort().join("|");

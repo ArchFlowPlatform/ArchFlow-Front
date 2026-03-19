@@ -6,6 +6,7 @@ interface SprintSummaryCardProps {
   burnedHours: number;
   remainingHours: number;
   periodLabel: string;
+  onCreateSprint?: () => void;
 }
 
 function formatHours(value: number): string {
@@ -28,6 +29,7 @@ export default function SprintSummaryCard({
   burnedHours,
   remainingHours,
   periodLabel,
+  onCreateSprint,
 }: SprintSummaryCardProps) {
   const capacity = sprint.capacityHours;
 
@@ -57,6 +59,16 @@ export default function SprintSummaryCard({
               >
                 {formatStatusLabel(sprint.status)}
               </span>
+
+            {onCreateSprint ? (
+              <button
+                type="button"
+                onClick={onCreateSprint}
+                className="af-focus-ring af-surface-sm af-accent-hover inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:text-white/90 disabled:opacity-50"
+              >
+                Criar Sprint
+              </button>
+            ) : null}
             </div>
             <p className="af-text-secondary text-xs">{sprint.goal}</p>
           </div>

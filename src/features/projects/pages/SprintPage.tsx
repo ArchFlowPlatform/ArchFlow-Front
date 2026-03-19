@@ -12,6 +12,9 @@ import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useProject } from "../hooks/useProject";
 import { useSprintViewModel } from "../hooks/useSprintViewModel";
+import CreateSprintModal from "@/components/sprint/CreateSprintModal";
+import InlineToast from "@/components/ui/InlineToast";
+import { useToast } from "@/hooks/useToast";
 
 interface SprintPageProps {
   projectId?: string;
@@ -42,13 +45,19 @@ const PLACEHOLDER_USER = {
 
 export default function SprintPage({ projectId }: SprintPageProps) {
   const [query, setQuery] = useState("");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const effectiveProjectId = projectId ?? "";
   const { user } = useAuth();
   const { project } = useProject(effectiveProjectId || null);
-  const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
-    effectiveProjectId || ""
-  );
+  const {
+    sprints,
+    selectedSprintId,
+    selectedSprint,
+    refetchSprints,
+    setSelectedSprintId,
+  } = useProjectSprint(effectiveProjectId || "");
+  const { toast, showError } = useToast();
   const {
     taskViews,
     burndownPoints,
@@ -82,65 +91,114 @@ export default function SprintPage({ projectId }: SprintPageProps) {
 
   if (!sprints.length || !selectedSprintId) {
     return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwnerName={projectOwnerName}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint"
-        pageTitle="Sprint"
-        pageSubtitle="This project does not have any sprints yet."
-        currentUser={currentUser}
-        mainColumn={
-          <ProjectEmptyState
-            title="This project does not have any sprints yet."
-            description="Create a sprint to start planning scope, tracking progress, and viewing burndown metrics."
-            actionLabel="Create sprint"
-          />
-        }
-      />
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint"
+          pageTitle="Sprint"
+          pageSubtitle="This project does not have any sprints yet."
+          currentUser={currentUser}
+          mainColumn={
+            <ProjectEmptyState
+              title="This project does not have any sprints yet."
+              description="Create a sprint to start planning scope, tracking progress, and viewing burndown metrics."
+              actionLabel="Create sprint"
+              onAction={() => setCreateModalOpen(true)}
+            />
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
     );
   }
 
   if (loading && taskViews.length === 0) {
     return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwnerName={projectOwnerName}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint"
-        pageTitle="Sprint"
-        pageSubtitle="Loading sprint data…"
-        currentUser={currentUser}
-        mainColumn={
-          <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
-            <p className="af-text-secondary text-sm">Carregando…</p>
-          </div>
-        }
-      />
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint"
+          pageTitle="Sprint"
+          pageSubtitle="Loading sprint data…"
+          currentUser={currentUser}
+          mainColumn={
+            <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
+              <p className="af-text-secondary text-sm">Carregando…</p>
+            </div>
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
     );
   }
 
   if (error && taskViews.length === 0) {
     return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwnerName={projectOwnerName}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint"
-        pageTitle="Sprint"
-        pageSubtitle="Unable to load sprint."
-        currentUser={currentUser}
-        mainColumn={
-          <ProjectEmptyState
-            title="Failed to load sprint."
-            description={error.message}
-            actionLabel="Try again"
-          />
-        }
-      />
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint"
+          pageTitle="Sprint"
+          pageSubtitle="Unable to load sprint."
+          currentUser={currentUser}
+          mainColumn={
+            <ProjectEmptyState
+              title="Failed to load sprint."
+              description={error.message}
+              actionLabel="Try again"
+            />
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
     );
   }
 
@@ -148,41 +206,58 @@ export default function SprintPage({ projectId }: SprintPageProps) {
   const periodLabel = buildPeriodLabel(sprint.startDate, sprint.endDate);
 
   return (
-    <ProjectShell
-      projectId={effectiveProjectId}
-      projectName={projectName}
-      projectOwnerName={projectOwnerName}
-      projectBadgeLabel={projectBadgeLabel}
-      activeNavItem="sprint"
-      pageTitle="Sprint"
-      pageSubtitle={sprint.goal}
-      pageContextLabel={`${sprint.name} • ${periodLabel}`}
-      currentUser={currentUser}
-      showSearch
-      searchPlaceholder="Buscar tarefas do sprint..."
-      searchValue={query}
-      onSearchChange={setQuery}
-      mainColumn={
-        <div className="space-y-4 lg:space-y-5">
-          <SprintSummaryCard
-            sprint={sprint}
-            scopeHours={scopeHours}
-            burnedHours={burnedHours}
-            remainingHours={remainingHours}
-            periodLabel={periodLabel}
-          />
-
-          <section className="af-surface-lg min-w-0 w-full bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
-            <BurndownChart
-              points={burndownPoints}
+    <>
+      <InlineToast toast={toast} />
+      <ProjectShell
+        projectId={effectiveProjectId}
+        projectName={projectName}
+        projectOwnerName={projectOwnerName}
+        projectBadgeLabel={projectBadgeLabel}
+        activeNavItem="sprint"
+        pageTitle="Sprint"
+        pageSubtitle={sprint.goal}
+        pageContextLabel={`${sprint.name} • ${periodLabel}`}
+        currentUser={currentUser}
+        showSearch
+        searchPlaceholder="Buscar tarefas do sprint..."
+        searchValue={query}
+        onSearchChange={setQuery}
+        mainColumn={
+          <div className="space-y-4 lg:space-y-5">
+            <SprintSummaryCard
+              sprint={sprint}
               scopeHours={scopeHours}
               burnedHours={burnedHours}
               remainingHours={remainingHours}
+              periodLabel={periodLabel}
+              onCreateSprint={() => setCreateModalOpen(true)}
             />
-          </section>
-        </div>
-      }
-      sideColumn={<SprintTasksPanel tasks={filteredTaskViews} />}
-    />
+
+            <section className="af-surface-lg min-w-0 w-full bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
+              <BurndownChart
+                points={burndownPoints}
+                scopeHours={scopeHours}
+                burnedHours={burnedHours}
+                remainingHours={remainingHours}
+              />
+            </section>
+          </div>
+        }
+        sideColumn={<SprintTasksPanel tasks={filteredTaskViews} />}
+      />
+      <CreateSprintModal
+        projectId={effectiveProjectId}
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={async (sprint) => {
+          try {
+            await refetchSprints();
+            setSelectedSprintId(sprint.id);
+          } catch (e) {
+            showError(e instanceof Error ? e.message : String(e));
+          }
+        }}
+      />
+    </>
   );
 }

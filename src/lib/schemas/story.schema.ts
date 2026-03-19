@@ -1,9 +1,15 @@
 import { z } from "zod";
 
 export const createStoryFormSchema = z.object({
-  title: z.string().min(1, "Título é obrigatório"),
-  persona: z.string().min(1, "Persona é obrigatória"),
-  description: z.string().min(1, "Descrição é obrigatória"),
+  title: z
+    .string()
+    .refine((v) => v.trim().length > 0, "Título é obrigatório"),
+  persona: z
+    .string()
+    .refine((v) => v.trim().length > 0, "Persona é obrigatória"),
+  description: z
+    .string()
+    .refine((v) => v.trim().length > 0, "Descrição é obrigatória"),
   acceptanceCriteria: z.string().default(""),
   complexity: z.enum(["low", "medium", "high", "very_high"]).default("medium"),
   effort: z.coerce.number().int().min(0).optional(),

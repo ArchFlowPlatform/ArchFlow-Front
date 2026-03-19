@@ -57,9 +57,10 @@ function readStoredSelection(): Record<string, string> {
 }
 
 function getDefaultSprintId(sprints: Sprint[]): string | null {
-  const active = sprints.find((s) => s.status === "active");
+  const visible = sprints.filter((s) => !s.isArchived);
+  const active = visible.find((s) => s.status === "active");
   if (active) return active.id;
-  return sprints[0]?.id ?? null;
+  return visible[0]?.id ?? null;
 }
 
 /**
@@ -118,7 +119,7 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
   );
   const storedSprintId = context.selectedSprintIdByProject[projectId];
   const selectedSprintId = useMemo(() => {
-    if (storedSprintId && sprints.some((s) => s.id === storedSprintId)) {
+    if (storedSprintId && sprints.some((s) => s.id === storedSprintId && !s.isArchived)) {
       return storedSprintId;
     }
     return getDefaultSprintId(sprints);
@@ -137,7 +138,7 @@ export function useProjectSprint(projectId: string): UseProjectSprintResult {
   const selectedSprint = useMemo(
     () =>
       selectedSprintId
-        ? sprints.find((s) => s.id === selectedSprintId) ?? null
+        ? sprints.find((s) => s.id === selectedSprintId && !s.isArchived) ?? null
         : null,
     [sprints, selectedSprintId],
   );

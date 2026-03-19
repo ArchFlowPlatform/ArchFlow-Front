@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 
 import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
@@ -11,6 +12,7 @@ import StorySprintCard from "@/components/sprint-backlog/StorySprintCard";
 import WorkloadPanel from "@/components/sprint-backlog/WorkloadPanel";
 import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import CreateSprintModal from "@/components/sprint/CreateSprintModal";
 import { createSprintItem, deleteSprintItem } from "@/features/sprint-items/api/sprint-items.api";
 import { createTask, deleteTask } from "@/features/story-tasks/api/story-tasks.api";
 import { useToast } from "@/hooks/useToast";
@@ -47,6 +49,7 @@ export default function SprintBacklogPage({
   projectId,
 }: SprintBacklogPageProps) {
   const [query, setQuery] = useState("");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [mutating, setMutating] = useState(false);
   const [addStoryId, setAddStoryId] = useState("");
   const { toast, showError } = useToast();
@@ -54,9 +57,13 @@ export default function SprintBacklogPage({
   const effectiveProjectId = projectId ?? "";
   const { user } = useAuth();
   const { project } = useProject(effectiveProjectId || null);
-  const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
-    effectiveProjectId || ""
-  );
+  const {
+    sprints,
+    selectedSprintId,
+    selectedSprint,
+    refetchSprints,
+    setSelectedSprintId,
+  } = useProjectSprint(effectiveProjectId || "");
   const { view, loading, error, refetch, availableBacklogStories } =
     useSprintBacklogView(
       effectiveProjectId || null,
@@ -87,6 +94,12 @@ export default function SprintBacklogPage({
   const stories = view?.stories ?? [];
   const sprint = view?.sprint ?? null;
   const periodLabel = sprint ? buildPeriodLabel(sprint.startDate, sprint.endDate) : "";
+  const sprintStatusLabel =
+    sprint?.status === "active"
+      ? "active"
+      : sprint?.status === "completed"
+        ? "completed"
+        : "planned";
   const normalizedQuery = query.trim().toLowerCase();
 
   const filteredStories = useMemo(
@@ -199,66 +212,115 @@ export default function SprintBacklogPage({
 
   if (!sprints.length || !selectedSprintId) {
     return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwnerName={projectOwnerName}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint-backlog"
-        pageTitle="Sprint Backlog"
-        pageSubtitle="This project does not have any sprints yet."
-        currentUser={placeholderUser}
-        mainColumn={
-          <ProjectEmptyState
-            title="This project does not have any sprints yet."
-            description="Create a sprint before planning user stories and tasks for execution."
-            actionLabel="Create sprint"
-          />
-        }
-      />
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint-backlog"
+          pageTitle="Sprint Backlog"
+          pageSubtitle="This project does not have any sprints yet."
+          currentUser={placeholderUser}
+          mainColumn={
+            <ProjectEmptyState
+              title="This project does not have any sprints yet."
+              description="Create a sprint before planning user stories and tasks for execution."
+              actionLabel="Create sprint"
+              onAction={() => setCreateModalOpen(true)}
+            />
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
     );
   }
 
   if (loading && !view) {
     return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwnerName={projectOwnerName}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint-backlog"
-        pageTitle="Sprint Backlog"
-        pageSubtitle="Loading sprint items…"
-        currentUser={placeholderUser}
-        mainColumn={
-          <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
-            <p className="af-text-secondary text-sm">Carregando…</p>
-          </div>
-        }
-      />
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint-backlog"
+          pageTitle="Sprint Backlog"
+          pageSubtitle="Loading sprint items…"
+          currentUser={placeholderUser}
+          mainColumn={
+            <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
+              <p className="af-text-secondary text-sm">Carregando…</p>
+            </div>
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
     );
   }
 
   if (error) {
     return (
-      <ProjectShell
-        projectId={effectiveProjectId}
-        projectName={projectName}
-        projectOwnerName={projectOwnerName}
-        projectBadgeLabel={projectBadgeLabel}
-        activeNavItem="sprint-backlog"
-        pageTitle="Sprint Backlog"
-        pageSubtitle="Unable to load sprint backlog."
-        currentUser={placeholderUser}
-        mainColumn={
-          <ProjectEmptyState
-            title="Failed to load sprint backlog."
-            description={error.message}
-            actionLabel="Try again"
-            onAction={() => void refetch()}
-          />
-        }
-      />
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint-backlog"
+          pageTitle="Sprint Backlog"
+          pageSubtitle="Unable to load sprint backlog."
+          currentUser={placeholderUser}
+          mainColumn={
+            <ProjectEmptyState
+              title="Failed to load sprint backlog."
+              description={error.message}
+              actionLabel="Try again"
+              onAction={() => void refetch()}
+            />
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
     );
   }
 
@@ -338,15 +400,55 @@ export default function SprintBacklogPage({
           ) : null}
 
           {stories.length === 0 ? (
-            <ProjectEmptyState
-              title="No items in this sprint."
-              description={
-                availableBacklogStories.length > 0
-                  ? "Use o seletor acima para adicionar user stories do backlog a esta sprint."
-                  : "This sprint has not received any backlog items yet. Add stories in the product backlog, then add them here."
-              }
-              actionLabel="Add item to sprint"
-            />
+            <section className="af-surface-lg bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
+              <header className="af-separator-b pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-white">
+                      User Stories na Sprint
+                    </h2>
+                    <p className="af-text-secondary mt-1 text-xs">
+                      Itens planejados para entrega em {periodLabel}.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`af-surface-sm inline-flex items-center px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                        sprint?.status === "active"
+                          ? "af-accent-chip-strong text-white"
+                          : "bg-white/5 text-white/72"
+                      }`}
+                    >
+                      {sprintStatusLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCreateModalOpen(true)}
+                      className="af-focus-ring af-surface-sm af-accent-hover inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:text-white/90 disabled:opacity-50"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden />
+                      Criar Sprint
+                    </button>
+                    <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/72">
+                      {filteredStories.length} stories
+                    </span>
+                  </div>
+                </div>
+              </header>
+
+              <div className="mt-3">
+                <ProjectEmptyState
+                  title="No items in this sprint."
+                  description={
+                    availableBacklogStories.length > 0
+                      ? "Use o seletor acima para adicionar user stories do backlog a esta sprint."
+                      : "This sprint has not received any backlog items yet. Add stories in the product backlog, then add them here."
+                  }
+                  actionLabel="Add item to sprint"
+                />
+              </div>
+            </section>
           ) : (
             <section className="af-surface-lg bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">
               <header className="af-separator-b pb-3">
@@ -360,9 +462,28 @@ export default function SprintBacklogPage({
                     </p>
                   </div>
 
-                  <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/72">
-                    {filteredStories.length} stories
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`af-surface-sm inline-flex items-center px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                        sprint?.status === "active"
+                          ? "af-accent-chip-strong text-white"
+                          : "bg-white/5 text-white/72"
+                      }`}
+                    >
+                      {sprintStatusLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCreateModalOpen(true)}
+                      className="af-focus-ring af-surface-sm af-accent-hover inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:text-white/90 disabled:opacity-50"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden />
+                      Criar Sprint
+                    </button>
+                    <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/72">
+                      {filteredStories.length} stories
+                    </span>
+                  </div>
                 </div>
               </header>
 
@@ -420,6 +541,19 @@ export default function SprintBacklogPage({
           />
         )
       }
+    />
+    <CreateSprintModal
+      projectId={effectiveProjectId}
+      open={createModalOpen}
+      onClose={() => setCreateModalOpen(false)}
+      onCreated={async (sprint) => {
+        try {
+          await refetchSprints();
+          setSelectedSprintId(sprint.id);
+        } catch (e) {
+          showError(e instanceof Error ? e.message : String(e));
+        }
+      }}
     />
     </>
   );

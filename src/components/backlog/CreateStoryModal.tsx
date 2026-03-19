@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ModalShell from "@/components/ui/ModalShell";
 import SelectDropdown from "@/components/ui/SelectDropdown";
 import { createStoryFormSchema, type CreateStoryFormData } from "@/lib/schemas/story.schema";
@@ -11,6 +11,8 @@ import {
 } from "@/lib/enum-labels";
 import type { CreateStoryRequest } from "@/types/requests";
 import type { ProjectMember } from "@/types/project";
+import type { User } from "@/types/user";
+import { resolveUsersByIdCached } from "@/lib/users/resolve-assignee-names";
 
 interface CreateStoryModalProps {
   open: boolean;
@@ -52,13 +54,58 @@ export default function CreateStoryModal({
   const [form, setForm] = useState<CreateStoryFormData>({ ...INITIAL });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateStoryFormData, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [resolvedUsersById, setResolvedUsersById] = useState<Record<string, User>>({});
+
+  const memberIdsToResolve = useMemo(() => {
+    return Array.from(
+      new Set(
+        members
+          .map((m) => m.userId)
+          .filter((id): id is string => Boolean(id && id.trim())),
+      ),
+    );
+  }, [members]);
+
+  const memberIdsKey = useMemo(() => {
+    return [...memberIdsToResolve].sort().join("|");
+  }, [memberIdsToResolve]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run(): Promise<void> {
+      if (memberIdsToResolve.length === 0) {
+        return;
+      }
+
+      try {
+        const resolved = await resolveUsersByIdCached(memberIdsToResolve);
+        if (cancelled) return;
+        setResolvedUsersById((prev) => ({ ...prev, ...resolved }));
+      } finally {
+        // No loading state needed: the dropdown will update when resolved users arrive.
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [memberIdsKey, memberIdsToResolve]);
 
   const memberOptions = useMemo(
     () => [
       { value: "", label: "Sem responsável" },
-      ...members.map((m) => ({ value: m.userId, label: m.user?.name ?? m.userId })),
+      ...members.map((m) => {
+        const resolved = resolvedUsersById[m.userId]?.name;
+        return {
+          value: m.userId,
+          label: resolved ?? m.user?.name ?? "—",
+        };
+      }),
     ],
-    [members],
+    [members, resolvedUsersById],
   );
 
   function set<K extends keyof CreateStoryFormData>(key: K, value: CreateStoryFormData[K]) {
@@ -121,6 +168,16 @@ export default function CreateStoryModal({
     onClose();
   }, [submitting, onClose]);
 
+  const titleInputCls = errors.title
+    ? inputCls + " border-red-400/70 focus:border-red-400/70"
+    : inputCls;
+  const personaInputCls = errors.persona
+    ? inputCls + " border-red-400/70 focus:border-red-400/70"
+    : inputCls;
+  const descriptionTextareaCls = errors.description
+    ? inputCls + " border-red-400/70 focus:border-red-400/70"
+    : inputCls;
+
   return (
     <ModalShell
       open={open}
@@ -171,7 +228,7 @@ export default function CreateStoryModal({
               placeholder="Ex: Cadastro de usuário via e-mail"
               autoFocus
               disabled={submitting}
-              className={inputCls}
+              className={titleInputCls}
             />
             {errors.title && <p className={errCls}>{errors.title}</p>}
           </label>
@@ -184,7 +241,7 @@ export default function CreateStoryModal({
               onChange={(e) => set("persona", e.target.value)}
               placeholder="Ex: Usuário não autenticado"
               disabled={submitting}
-              className={inputCls}
+              className={personaInputCls}
             />
             {errors.persona && <p className={errCls}>{errors.persona}</p>}
           </label>
@@ -197,7 +254,7 @@ export default function CreateStoryModal({
               placeholder="Descreva a user story…"
               rows={3}
               disabled={submitting}
-              className={inputCls + " resize-y"}
+              className={descriptionTextareaCls + " resize-y"}
             />
             {errors.description && <p className={errCls}>{errors.description}</p>}
           </label>
@@ -233,6 +290,7 @@ export default function CreateStoryModal({
                 onChange={(v) => set("complexity", v as CreateStoryFormData["complexity"])}
                 disabled={submitting}
               />
+              {errors.complexity && <p className={errCls}>{errors.complexity}</p>}
             </div>
 
             <label className="block">
@@ -271,6 +329,7 @@ export default function CreateStoryModal({
                 onChange={(v) => set("businessValue", v as CreateStoryFormData["businessValue"])}
                 disabled={submitting}
               />
+              {errors.businessValue && <p className={errCls}>{errors.businessValue}</p>}
             </div>
           </div>
 
@@ -302,6 +361,7 @@ export default function CreateStoryModal({
                 onChange={(v) => set("status", v as CreateStoryFormData["status"])}
                 disabled={submitting}
               />
+              {errors.status && <p className={errCls}>{errors.status}</p>}
             </div>
 
             <div>
