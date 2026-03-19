@@ -4,10 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Paperclip, Tag, Trash2, X } from "lucide-react";
 
 import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
-import {
-  formatKanbanStoryStatus,
-  getCardSystemBadges,
-} from "@/features/projects/mocks/kanban.mock";
+import { getCardSystemBadges } from "@/features/projects/mocks/kanban.mock";
+import EnumBadge from "@/components/ui/EnumBadge";
+import { BUSINESS_VALUE_OPTIONS, STORY_STATUS_OPTIONS } from "@/lib/enum-labels";
 import { useCardComments } from "@/features/card-comments/hooks/useCardComments";
 import { useCardLabels } from "@/features/card-labels/hooks/useCardLabels";
 import { useCardAttachments } from "@/features/card-attachments/hooks/useCardAttachments";
@@ -270,6 +269,8 @@ export default function KanbanModal({
                     {(getCardSystemBadges(card) ?? []).map((badge) => (
                       <SystemBadge key={badge}>{badge}</SystemBadge>
                     ))}
+                    <EnumBadge options={BUSINESS_VALUE_OPTIONS} value={card.businessValue} />
+                    <EnumBadge options={STORY_STATUS_OPTIONS} value={card.status} />
                   </div>
                 </div>
 
@@ -315,14 +316,12 @@ export default function KanbanModal({
                       </div>
                     ) : null}
                     <div className="flex flex-wrap items-center gap-2">
-                      {[
-                        `Effort: ${card.effort}`,
-                        `BV ${card.businessValue}`,
-                        formatKanbanStoryStatus(card.status),
-                        card.dueDateLabel,
-                        ...(card.linkedChips ?? []),
-                      ].map((badge) => (
-                        <SystemBadge key={badge}>{badge}</SystemBadge>
+                      <SystemBadge>{`Effort: ${card.effort}`}</SystemBadge>
+                      <EnumBadge options={BUSINESS_VALUE_OPTIONS} value={card.businessValue} />
+                      <EnumBadge options={STORY_STATUS_OPTIONS} value={card.status} />
+                      <SystemBadge>{card.dueDateLabel}</SystemBadge>
+                      {(card.linkedChips ?? []).map((chip) => (
+                        <SystemBadge key={chip}>{chip}</SystemBadge>
                       ))}
                     </div>
                   </div>

@@ -1,6 +1,8 @@
 import UserAvatar from "../ui/UserAvatar";
+import EnumBadge from "@/components/ui/EnumBadge";
 import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
 import { getInlineCardSystemBadges } from "@/features/projects/mocks/kanban.mock";
+import { BUSINESS_VALUE_OPTIONS, STORY_STATUS_OPTIONS } from "@/lib/enum-labels";
 import SystemBadge from "./SystemBadge";
 import UserLabelBadge from "./UserLabelBadge";
 
@@ -80,6 +82,8 @@ export default function KanbanCard({
                   <SystemBadge key={item.key}>{item.badge}</SystemBadge>
                 ),
               )}
+              <EnumBadge options={BUSINESS_VALUE_OPTIONS} value={card.businessValue} />
+              <EnumBadge options={STORY_STATUS_OPTIONS} value={card.status} />
             </div>
           </div>
 

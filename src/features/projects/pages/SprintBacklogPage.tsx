@@ -6,6 +6,7 @@ import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import InlineToast from "@/components/ui/InlineToast";
+import SelectDropdown from "@/components/ui/SelectDropdown";
 import StorySprintCard from "@/components/sprint-backlog/StorySprintCard";
 import WorkloadPanel from "@/components/sprint-backlog/WorkloadPanel";
 import { authUserToUser } from "@/features/auth/types/auth.types";
@@ -303,24 +304,21 @@ export default function SprintBacklogPage({
         <>
           {selectedSprintId && availableBacklogStories.length > 0 ? (
             <div className="af-surface-lg mb-4 flex flex-wrap items-end gap-3 bg-[#14121a]/70 px-4 py-3 sm:px-5">
-              <label className="min-w-[14rem] flex-1">
+              <div className="min-w-[14rem] flex-1">
                 <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
                   Adicionar user story à sprint
                 </span>
-                <select
+                <SelectDropdown
                   value={addStoryId}
-                  onChange={(e) => setAddStoryId(e.target.value)}
+                  options={availableBacklogStories.map((s) => ({
+                    value: String(s.id),
+                    label: s.title,
+                  }))}
+                  onChange={(v) => setAddStoryId(v)}
+                  placeholder="Selecione…"
                   disabled={mutating}
-                  className="af-focus-ring w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
-                >
-                  <option value="">Selecione…</option>
-                  {availableBacklogStories.map((s) => (
-                    <option key={s.id} value={String(s.id)}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+              </div>
               <button
                 type="button"
                 disabled={mutating || !addStoryId}

@@ -112,22 +112,13 @@ function formatDate(dateISO: string): string {
   return new Date(dateISO).toLocaleDateString("pt-BR");
 }
 
-function formatBusinessValue(value: BusinessValue): string {
-  if (value === "high") return "BV high";
-  if (value === "medium") return "BV medium";
-  return "BV low";
-}
-
 function formatPriorityTone(priority: UserStoryPriority): string {
   if (priority === "P1") return "high";
   if (priority === "P2") return "medium";
   return "low";
 }
 
-export function formatKanbanStoryStatus(status: UserStoryStatus): string {
-  if (status === "in_progress") return "in progress";
-  return status;
-}
+
 
 export function buildKanbanColumns(
   cards: KanbanCardView[],
@@ -173,8 +164,6 @@ export function getCardSystemBadges(card: KanbanCardView): string[] {
     card.dueDateLabel,
     `Est/Act: ${card.estimatedHours}h / ${card.doneHours}h`,
     `Effort: ${card.effort}`,
-    formatBusinessValue(card.businessValue),
-    formatKanbanStoryStatus(card.status),
     ...card.linkedChips,
   ];
 }
@@ -182,8 +171,6 @@ export function getCardSystemBadges(card: KanbanCardView): string[] {
 export function getInlineCardSystemBadges(card: KanbanCardView): string[] {
   return [
     `Effort: ${card.effort}`,
-    formatBusinessValue(card.businessValue),
-    formatKanbanStoryStatus(card.status),
     formatDate(card.dueDateISO),
     ...card.linkedChips,
   ];

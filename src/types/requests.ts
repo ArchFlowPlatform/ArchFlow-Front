@@ -47,8 +47,10 @@ export interface CreateEpicRequest {
   name: string;
   description?: string;
   businessValue?: string;
+  status?: string;
   priority?: number;
   color?: string;
+  isArchived?: boolean;
 }
 
 export interface UpdateEpicRequest {
@@ -68,14 +70,15 @@ export interface ReorderEpicsRequest {
 export interface CreateStoryRequest {
   epicId: number;
   title: string;
-  persona?: string;
-  description?: string;
+  persona: string;
+  description: string;
   acceptanceCriteria?: string;
   complexity?: string;
   effort?: number;
   dependencies?: string;
   priority?: number;
   businessValue?: string;
+  status?: string;
   assigneeId?: string | null;
 }
 
