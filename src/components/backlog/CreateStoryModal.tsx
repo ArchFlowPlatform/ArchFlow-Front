@@ -205,10 +205,6 @@ export default function CreateStoryModal({
 
         {/* Section 2 — Acceptance */}
         <fieldset className="space-y-3">
-          <legend className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
-            Critérios de Aceite
-          </legend>
-
           <label className="block">
             <span className={labelCls}>Critérios de Aceite</span>
             <textarea
