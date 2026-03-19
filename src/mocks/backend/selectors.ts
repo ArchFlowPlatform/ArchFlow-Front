@@ -271,12 +271,8 @@ export function priorityNumberToLabel(priority: number): "P1" | "P2" | "P3" {
 }
 
 export function splitAcceptanceCriteria(value: string | null): string[] {
-  if (!value) {
-    return [];
-  }
-
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  if (value == null) return [];
+  if (value === "") return [];
+  // Preserve content exactly: keep empty lines and do not trim.
+  return value.split(/\r?\n/);
 }

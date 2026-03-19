@@ -13,6 +13,7 @@ import { getCards } from "@/features/board/api/board-cards.api";
 import { useBoardColumns } from "@/features/board/hooks/useBoardColumns";
 import { useBacklog } from "@/features/backlog/hooks/useBacklog";
 import { useProject } from "@/features/projects/hooks/useProject";
+import { resolveUsersByIdCached } from "@/lib/users/resolve-assignee-names";
 import type {
   KanbanBoardViewModel,
   KanbanCardView,
@@ -30,8 +31,11 @@ function priorityNumberToLabel(priority: number): UserStoryPriority {
 }
 
 function splitAcceptanceCriteria(value: string | null | undefined): string[] {
-  if (!value) return [];
-  return value.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (value == null) return [];
+  if (value === "") return [];
+  // Preserve content exactly: keep empty lines and do not trim.
+  // Split on both Unix and Windows newlines.
+  return value.split(/\r?\n/);
 }
 
 function formatDate(dateISO: string): string {
@@ -51,14 +55,20 @@ function formatDateTime(dateISO: string): string {
 function resolveUser(
   assigneeId: string | null,
   members: { user?: User }[],
-  fallback: string
+  fallback: string,
+  resolvedUsersById: Record<string, User>
 ): User {
   if (!assigneeId?.trim()) {
     return { id: "", name: fallback, email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" } as User;
   }
+
+  const resolved = resolvedUsersById[assigneeId];
+  if (resolved?.name) return resolved;
+
   const m = members.find((x) => x.user?.id === assigneeId);
   if (m?.user) return m.user;
-  return { id: assigneeId, name: "—", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" } as User;
+
+  return { id: assigneeId, name: "Sem responsável", email: "", type: "", avatarUrl: "", createdAt: "", updatedAt: "" } as User;
 }
 
 export interface UseKanbanBoardViewResult {
@@ -88,9 +98,63 @@ export function useKanbanBoardView(
   const [cardsError, setCardsError] = useState<Error | null>(null);
 
   const members = project?.members ?? [];
+  const [resolvedUsersById, setResolvedUsersById] = useState<Record<string, User>>({});
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
   const epics = backlog?.epics ?? [];
   const epicNameByEpicId = new Map(epics.map((e) => [e.id, e.name]));
   const allStories = epics.flatMap((e) => e.userStories ?? []);
+
+  const assigneeIdsToResolve = useMemo(() => {
+    if (colsLoading || cardsLoading) return [];
+    if (colsError || cardsError) return [];
+
+    const ids = new Set<string>();
+    for (const cards of Object.values(cardsByColumnId)) {
+      for (const card of cards) {
+        const story = card.userStory ?? allStories.find((s) => s.id === card.userStoryId);
+        const id = story?.assigneeId;
+        if (id?.trim()) ids.add(id);
+      }
+    }
+    return Array.from(ids);
+  }, [
+    cardsByColumnId,
+    allStories,
+    colsLoading,
+    cardsLoading,
+    colsError,
+    cardsError,
+  ]);
+
+  const assigneeIdsKey = useMemo(() => {
+    return [...assigneeIdsToResolve].sort().join("|");
+  }, [assigneeIdsToResolve]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run(): Promise<void> {
+      if (assigneeIdsToResolve.length === 0) {
+        setAssigneesLoading(false);
+        return;
+      }
+
+      setAssigneesLoading(true);
+      try {
+        const resolved = await resolveUsersByIdCached(assigneeIdsToResolve);
+        if (cancelled) return;
+        setResolvedUsersById((prev) => ({ ...prev, ...resolved }));
+      } finally {
+        if (!cancelled) setAssigneesLoading(false);
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assigneeIdsKey, assigneeIdsToResolve]);
 
   const fetchCardsForColumns = useCallback(
     async (colIds: number[]) => {
@@ -151,12 +215,12 @@ export function useKanbanBoardView(
     }
   }, [refetchCols, fetchCardsForColumns]);
 
-  const loading = colsLoading || cardsLoading;
+  const loading = colsLoading || cardsLoading || assigneesLoading;
   const error = colsError ?? cardsError;
 
   const view = useMemo<KanbanBoardViewModel | null>(() => {
     if (!sprint || !projectId || !sprintId) return null;
-    if (colsLoading || cardsLoading) return null;
+    if (colsLoading || cardsLoading || assigneesLoading) return null;
     if (colsError || cardsError) return null;
 
     const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
@@ -171,7 +235,12 @@ export function useKanbanBoardView(
         if (!story) continue;
 
         const epicName = epicNameByEpicId.get(story.epicId) ?? "—";
-        const assignee = resolveUser(story.assigneeId, members, "Sem responsável");
+        const assignee = resolveUser(
+          story.assigneeId,
+          members,
+          "Sem responsável",
+          resolvedUsersById,
+        );
         const dueDate = card.updatedAt?.slice(0, 10) ?? story.updatedAt?.slice(0, 10) ?? "";
         const searchText = [
           story.title,
@@ -258,10 +327,12 @@ export function useKanbanBoardView(
     sprint,
     colsLoading,
     cardsLoading,
+    assigneesLoading,
     colsError,
     cardsError,
     epics,
     members,
+    resolvedUsersById,
     projectId,
     sprintId,
   ]);

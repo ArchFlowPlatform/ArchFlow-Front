@@ -343,21 +343,21 @@ export default function KanbanModal({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
                   Critérios de aceitação
                 </p>
-                <div className="space-y-2">
-                  {(Array.isArray(card.acceptanceCriteria)
-                    ? card.acceptanceCriteria
-                    : typeof card.acceptanceCriteria === "string"
-                      ? [card.acceptanceCriteria]
-                      : []
-                  ).map((criterion) => (
-                    <div
-                      key={criterion}
-                      className="af-surface-md bg-white/[0.03] px-3 py-2 text-sm text-white/70"
-                    >
-                      {criterion}
-                    </div>
-                  ))}
-                </div>
+                  <div className="space-y-2">
+                    {(Array.isArray(card.acceptanceCriteria)
+                      ? card.acceptanceCriteria
+                      : typeof card.acceptanceCriteria === "string"
+                        ? [card.acceptanceCriteria]
+                        : []
+                    ).map((criterion, i) => (
+                      <div
+                        key={i}
+                        className="af-surface-md bg-white/[0.03] px-3 py-2 text-sm text-white/70"
+                      >
+                        {criterion}
+                      </div>
+                    ))}
+                  </div>
               </section>
 
               <section className="space-y-2">

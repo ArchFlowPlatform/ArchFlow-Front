@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Archive, ChevronDown, ChevronRight, Plus } from "lucide-react";
 
 import TriageQueue, {
@@ -43,7 +43,9 @@ import {
   COMPLEXITY_OPTIONS,
 } from "@/lib/enum-labels";
 import type { UserStory } from "@/types/backlog";
+import type { User } from "@/types/user";
 import type { CreateEpicRequest, CreateStoryRequest } from "@/types/requests";
+import { resolveUsersByIdCached } from "@/lib/users/resolve-assignee-names";
 
 interface ProductBacklogPageProps {
   projectId?: string;
@@ -56,8 +58,11 @@ type StoryWithLegacyCriteria = UserStory & {
 function getAssigneeName(
   assigneeId: string,
   members: { userId?: string; user?: { id: string; name: string } }[],
+  resolvedUsersById: Record<string, User>,
 ): string {
   if (!assigneeId?.trim()) return "Sem responsável";
+  const resolved = resolvedUsersById[assigneeId];
+  if (resolved?.name) return resolved.name;
   const member = members.find(
     (m) => m.user?.id === assigneeId || m.userId === assigneeId,
   );
@@ -130,6 +135,9 @@ export default function ProductBacklogPage({
       })),
     [members],
   );
+
+  const [resolvedAssigneesById, setResolvedAssigneesById] = useState<Record<string, User>>({});
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
   const placeholderUser = authUserToUser(user) ?? {
     id: "",
     name: "—",
@@ -149,6 +157,46 @@ export default function ProductBacklogPage({
     () => epics.flatMap((epic) => epic.userStories ?? []),
     [epics],
   );
+
+  const assigneeIdsToResolve = useMemo(() => {
+    return Array.from(
+      new Set(
+        allStories
+          .map((s) => s.assigneeId)
+          .filter((id): id is string => Boolean(id && id.trim())),
+      ),
+    );
+  }, [allStories]);
+
+  const assigneeIdsKey = useMemo(() => {
+    return [...assigneeIdsToResolve].sort().join("|");
+  }, [assigneeIdsToResolve]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run(): Promise<void> {
+      if (assigneeIdsToResolve.length === 0) {
+        setAssigneesLoading(false);
+        return;
+      }
+
+      setAssigneesLoading(true);
+      try {
+        const resolved = await resolveUsersByIdCached(assigneeIdsToResolve);
+        if (cancelled) return;
+        setResolvedAssigneesById((prev) => ({ ...prev, ...resolved }));
+      } finally {
+        if (!cancelled) setAssigneesLoading(false);
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assigneeIdsKey, assigneeIdsToResolve]);
   const triageCounts = useMemo<TriageQueueCounts>(
     () => ({
       noAssignee: allStories.filter((s) => matchesTriageFilter(s, "noAssignee")).length,
@@ -170,7 +218,11 @@ export default function ProductBacklogPage({
               v.toLowerCase().includes(normalizedQuery),
             );
           const userStories = (epic.userStories ?? []).filter((story) => {
-            const assigneeName = getAssigneeName(story.assigneeId ?? "", members);
+            const assigneeName = getAssigneeName(
+              story.assigneeId ?? "",
+              members,
+              resolvedAssigneesById,
+            );
             const statusLabel = getLabelFor(STORY_STATUS_OPTIONS, story.status);
             const matchesSearch =
               epicMatches ||
@@ -197,7 +249,7 @@ export default function ProductBacklogPage({
             epic.userStories.length > 0 ||
             (!normalizedQuery && triageFilter === "none"),
         ),
-    [epics, normalizedQuery, triageFilter, members],
+    [epics, normalizedQuery, triageFilter, members, resolvedAssigneesById],
   );
 
   const totalStories = filteredEpics.reduce(
@@ -301,7 +353,7 @@ export default function ProductBacklogPage({
     }
   }, [effectiveProjectId, archiveTarget, refetch, showError, showSuccess]);
 
-  const loading = projectLoading || backlogLoading;
+  const loading = projectLoading || backlogLoading || assigneesLoading;
 
   return (
     <>
@@ -505,7 +557,11 @@ export default function ProductBacklogPage({
                               {(epic.userStories ?? []).map((story) => {
                                 const storyIdStr = String(story.id);
                                 const isExpanded = expandedStoryIds.has(storyIdStr);
-                                const assigneeName = getAssigneeName(story.assigneeId ?? "", members);
+                                const assigneeName = getAssigneeName(
+                                  story.assigneeId ?? "",
+                                  members,
+                                  resolvedAssigneesById,
+                                );
 
                                 return (
                                   <Fragment key={story.id}>

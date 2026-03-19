@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Sprint } from "@/types/sprint";
 import type { UserStory } from "@/types/backlog";
 import type { User } from "@/types/user";
+import { resolveUsersByIdCached } from "@/lib/users/resolve-assignee-names";
 import { getTasks } from "@/features/story-tasks/api/story-tasks.api";
 import { useSprintItems } from "@/features/sprint-items/hooks/useSprintItems";
 import { useBacklog } from "@/features/backlog/hooks/useBacklog";
@@ -32,7 +33,8 @@ function formatLoadLabel(weightRatio: number): string {
 function resolveUser(
   assigneeId: string | null,
   members: { user?: User }[],
-  fallbackName: string
+  fallbackName: string,
+  resolvedUsersById: Record<string, User>
 ): User {
   if (!assigneeId?.trim()) {
     return {
@@ -45,11 +47,15 @@ function resolveUser(
       updatedAt: "",
     } as User;
   }
+
+  const resolved = resolvedUsersById[assigneeId];
+  if (resolved?.name) return resolved;
+
   const member = members.find((m) => m.user?.id === assigneeId);
   if (member?.user) return member.user;
   return {
     id: assigneeId,
-    name: "—",
+    name: "Sem responsável",
     email: "",
     type: "",
     avatarUrl: "",
@@ -84,9 +90,62 @@ export function useSprintBacklogView(
   const [tasksError, setTasksError] = useState<Error | null>(null);
 
   const members = project?.members ?? [];
+  const [resolvedUsersById, setResolvedUsersById] = useState<Record<string, User>>({});
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
   const epics = backlog?.epics ?? [];
   const epicNameByEpicId = new Map(epics.map((e) => [e.id, e.name]));
   const allBacklogStories = epics.flatMap((e) => e.userStories ?? []);
+
+  const assigneeIdsToResolve = useMemo(() => {
+    if (itemsLoading || tasksLoading || backlogLoading || !projectId || !sprintId) return [];
+
+    const ids = new Set<string>();
+    for (const item of items) {
+      const story =
+        item.userStory ?? allBacklogStories.find((s) => s.id === item.userStoryId);
+      const id = story?.assigneeId;
+      if (id?.trim()) ids.add(id);
+    }
+    return Array.from(ids);
+  }, [
+    items,
+    itemsLoading,
+    tasksLoading,
+    backlogLoading,
+    projectId,
+    sprintId,
+    allBacklogStories,
+  ]);
+
+  const assigneeIdsKey = useMemo(() => {
+    return [...assigneeIdsToResolve].sort().join("|");
+  }, [assigneeIdsToResolve]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run(): Promise<void> {
+      if (assigneeIdsToResolve.length === 0) {
+        setAssigneesLoading(false);
+        return;
+      }
+
+      setAssigneesLoading(true);
+      try {
+        const resolved = await resolveUsersByIdCached(assigneeIdsToResolve);
+        if (cancelled) return;
+        setResolvedUsersById((prev) => ({ ...prev, ...resolved }));
+      } finally {
+        if (!cancelled) setAssigneesLoading(false);
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assigneeIdsKey, assigneeIdsToResolve]);
 
   const fetchTasksForItems = useCallback(
     async (itemIds: number[]) => {
@@ -146,7 +205,7 @@ export function useSprintBacklogView(
 
   const view: SprintBacklogViewModel | null = (() => {
     if (!sprint || !projectId || !sprintId) return null;
-    if (itemsLoading || tasksLoading) return null;
+    if (itemsLoading || tasksLoading || assigneesLoading) return null;
     if (itemsError || tasksError) return null;
 
     const stories: SprintBacklogStoryView[] = items
@@ -165,14 +224,20 @@ export function useSprintBacklogView(
             title: task.title,
             description: task.description ?? "",
             priorityLabel: priorityNumberToLabel(task.priority),
-            assignee: resolveUser(task.assigneeId, members, "Sem responsável"),
+            assignee: resolveUser(
+              task.assigneeId,
+              members,
+              "Sem responsável",
+              resolvedUsersById,
+            ),
             estimatedHours: task.estimatedHours ?? 0,
             doneHours: task.actualHours ?? 0,
           }));
         const storyAssignee = resolveUser(
           userStory.assigneeId,
           members,
-          taskViews[0] ? taskViews[0].assignee.name : "Sem responsável"
+          taskViews[0] ? taskViews[0].assignee.name : "Sem responsável",
+          resolvedUsersById
         );
         return {
           id: String(userStory.id),
@@ -260,7 +325,7 @@ export function useSprintBacklogView(
 
   return {
     view,
-    loading: itemsLoading || tasksLoading,
+    loading: itemsLoading || tasksLoading || assigneesLoading,
     error: itemsError ?? tasksError,
     refetch,
     availableBacklogStories,

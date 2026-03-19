@@ -54,12 +54,14 @@ export function InlineText({
   }, [editing, value]);
 
   const commit = useCallback(async () => {
-    const trimmed = draft.trim();
-    if (trimmed !== value) {
-      await onSave(trimmed);
+    // Preserve raw input for multiline fields (acceptance criteria, multiline descriptions).
+    // For single-line fields we keep trimming to avoid accidental whitespace edits.
+    const nextValue = multiline ? draft : draft.trim();
+    if (nextValue !== value) {
+      await onSave(nextValue);
     }
     setEditing(false);
-  }, [draft, value, onSave]);
+  }, [draft, value, onSave, multiline]);
 
   const cancel = useCallback(() => {
     setDraft(value);
@@ -110,6 +112,17 @@ export function InlineText({
 
   const display = displayValue ?? value;
   const wrapperCls = className ?? defaultViewCls;
+
+  if (multiline) {
+    return (
+      <div onClick={() => setEditing(true)} className={wrapperCls}>
+        <div className={`whitespace-pre-line ${textClassName ?? (display ? "" : "text-white/30")}`}>
+          {display || placeholder}
+        </div>
+        <Pencil className={iconCls} />
+      </div>
+    );
+  }
 
   return (
     <span onClick={() => setEditing(true)} className={wrapperCls}>
