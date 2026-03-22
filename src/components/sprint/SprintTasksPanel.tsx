@@ -1,4 +1,6 @@
 import type { SprintTaskView } from "@/features/projects/mocks/sprint.mock";
+import { getStoryTaskStatusMeta } from "@/lib/story-task-status";
+import { cx } from "@/lib/utils/cx";
 import TaskRowCard from "./TaskRowCard";
 
 interface SprintTasksPanelProps {
@@ -28,17 +30,29 @@ export default function SprintTasksPanel({ tasks }: SprintTasksPanelProps) {
       </header>
 
       <div className="mt-3 space-y-2.5">
-        {orderedTasks.map((task) => (
-          <TaskRowCard
-            key={task.id}
-            title={task.title}
-            priorityLabel={task.priorityLabel}
-            subtitle={task.assignee.name}
-            doneHours={task.doneHours}
-            estimatedHours={task.estimatedHours}
-            hoverable
-          />
-        ))}
+        {orderedTasks.map((task) => {
+          const st = getStoryTaskStatusMeta(task.status);
+          return (
+            <div key={task.id} className="space-y-1.5">
+              <span
+                className={cx(
+                  "af-surface-sm inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                  st.badgeCls,
+                )}
+              >
+                {st.label}
+              </span>
+              <TaskRowCard
+                title={task.title}
+                priorityLabel={task.priorityLabel}
+                subtitle={task.assignee.name}
+                doneHours={task.doneHours}
+                estimatedHours={task.estimatedHours}
+                hoverable
+              />
+            </div>
+          );
+        })}
       </div>
     </section>
   );

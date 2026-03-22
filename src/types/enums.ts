@@ -31,7 +31,7 @@ export type SprintStatus = "planned" | "active" | "completed" | "cancelled";
 
 export type BoardType = "kanban" | "scrum" | "custom";
 
-export type StoryTaskStatus = string;
+export type { StoryTaskStatus } from "@/lib/story-task-status";
 
 export type CardActivityType =
   | "moved"

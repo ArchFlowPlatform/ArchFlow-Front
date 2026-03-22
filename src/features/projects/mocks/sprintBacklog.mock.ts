@@ -1,4 +1,5 @@
 import { USE_MOCKS } from "@/lib/env";
+import type { StoryTaskStatus } from "@/lib/story-task-status";
 import type { User } from "@/types/user";
 
 type SprintStatus = "planned" | "active" | "completed" | "cancelled";
@@ -44,6 +45,8 @@ export interface StoryTaskRowView {
   title: string;
   description: string;
   priorityLabel: PriorityLabel;
+  /** StoryTaskStatus: Todo = 0, Doing = 1, Done = 2 */
+  status: StoryTaskStatus;
   assignee: User;
   estimatedHours: number;
   doneHours: number;
@@ -169,6 +172,7 @@ export function buildSprintBacklogView(
       title: task.title,
       description: task.description,
       priorityLabel: prioLabel(task.priority),
+      status: 0,
       assignee: getUser(task.assigneeId),
       estimatedHours: task.estimatedHours,
       doneHours: task.actualHours,

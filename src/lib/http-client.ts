@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from "axios";
 import type { ApiResponse } from "@/types/api";
+import { shareInFlightGet } from "@/lib/in-flight-get";
 
 const DEFAULT_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
@@ -64,13 +65,21 @@ export const httpClient = createHttpClient();
 
 /**
  * Typed GET request. Returns ApiResponse<T>.
+ * Identical concurrent GETs (same URL, no AbortSignal) share one request.
  */
 export async function get<T>(
   url: string,
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
-  const response = await httpClient.get<ApiResponse<T>>(url, config);
-  return response.data;
+  if (config?.signal) {
+    const response = await httpClient.get<ApiResponse<T>>(url, config);
+    return response.data;
+  }
+  const key = url;
+  return shareInFlightGet(key, async () => {
+    const response = await httpClient.get<ApiResponse<T>>(url, config);
+    return response.data;
+  });
 }
 
 /**

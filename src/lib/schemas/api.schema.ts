@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { normalizeStoryTaskStatus } from "@/lib/story-task-status";
 
 // ── Shared helpers ──────────────────────────────────────────
 
@@ -120,7 +121,10 @@ export const StoryTaskSchema = z.object({
   actualHours: z.number().nullable(),
   priority: z.number(),
   position: z.number(),
-  status: z.string(),
+  status: z.preprocess(
+    (v) => normalizeStoryTaskStatus(v),
+    z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  ),
   createdAt: isoDateString,
   updatedAt: isoDateString,
 });

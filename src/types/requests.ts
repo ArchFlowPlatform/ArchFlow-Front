@@ -3,15 +3,24 @@
  * Align with backend DTOs when documented. Used by API modules (Step 3+).
  */
 
-import type { MemberRole, ProjectStatus, SprintStatus, UserType } from "./enums";
+import type { MemberRole, ProjectStatus, StoryTaskStatus, UserType } from "./enums";
 
 // ----- Users (POST /api/users) — plan §2.2 -----
 
+/** Default `UserType` for public sign-up; must match backend (CreateUserDto). */
+export const DEFAULT_SIGNUP_USER_TYPE = "Free" as const satisfies UserType;
+
+/**
+ * CreateUserDto (backend): Name, Email, Password, Type (default Free), AvatarUrl (optional).
+ * Sign-up always sends `type: "Free"`; never expose type selection in the UI.
+ */
 export interface CreateUserRequest {
-  email: string;
   name: string;
+  email: string;
   password: string;
-  type?: UserType;
+  type: UserType;
+  /** Omit or `null` when empty — backend treats as optional. */
+  avatarUrl?: string | null;
 }
 
 // ----- Projects -----
@@ -118,6 +127,7 @@ export interface CreateSprintRequest {
   capacityHours?: number;
 }
 
+/** PATCH `api/projects/{projectId}/sprints/{sprintId}` — metadata only; lifecycle uses POST commands (see `transitionSprintStatus`). */
 export interface UpdateSprintRequest {
   name?: string;
   goal?: string;
@@ -125,8 +135,6 @@ export interface UpdateSprintRequest {
   startDate?: string;
   endDate?: string;
   capacityHours?: number;
-  /** Sprint lifecycle; aligns with `SprintStatus` / PATCH `api/projects/.../sprints/{id}`. */
-  status?: SprintStatus;
 }
 
 // ----- Sprint items -----
@@ -173,6 +181,7 @@ export interface UpdateBoardColumnRequest {
 // ----- Board cards -----
 
 export interface CreateBoardCardRequest {
+  /** Required: board cards represent a user story in the sprint scope. */
   userStoryId: number;
   position?: number;
 }
@@ -205,7 +214,7 @@ export interface UpdateStoryTaskRequest {
   actualHours?: number | null;
   priority?: number;
   position?: number;
-  status?: string;
+  status?: StoryTaskStatus;
 }
 
 export interface ReorderTasksRequest {

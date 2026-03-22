@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Sprint } from "@/types/sprint";
 import type { User } from "@/types/user";
 import { getTasks } from "@/features/story-tasks/api/story-tasks.api";
+import { normalizeStoryTaskStatus } from "@/lib/story-task-status";
 import { useSprintItems } from "@/features/sprint-items/hooks/useSprintItems";
 import { useProject } from "@/features/projects/hooks/useProject";
 import type { SprintTaskView, BurndownPoint } from "../mocks/sprint.mock";
@@ -154,6 +155,7 @@ export function useSprintViewModel(
           estimatedHours: task.estimatedHours ?? 0,
           doneHours: task.actualHours ?? 0,
           priorityLabel: priorityNumberToLabel(task.priority),
+          status: normalizeStoryTaskStatus(task.status),
         }));
     });
 

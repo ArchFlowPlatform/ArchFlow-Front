@@ -14,8 +14,13 @@ import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import CreateSprintModal from "@/components/sprint/CreateSprintModal";
 import { createSprintItem, deleteSprintItem } from "@/features/sprint-items/api/sprint-items.api";
-import { createTask, deleteTask } from "@/features/story-tasks/api/story-tasks.api";
+import {
+  createTask,
+  deleteTask,
+  updateTask,
+} from "@/features/story-tasks/api/story-tasks.api";
 import { useToast } from "@/hooks/useToast";
+import type { StoryTaskStatus } from "@/lib/story-task-status";
 import { useProject } from "../hooks/useProject";
 import { useSprintBacklogView } from "../hooks/useSprintBacklogView";
 import type {
@@ -61,6 +66,7 @@ export default function SprintBacklogPage({
     sprints,
     selectedSprintId,
     selectedSprint,
+    loading: sprintsLoading,
     refetchSprints,
     setSelectedSprintId,
   } = useProjectSprint(effectiveProjectId || "");
@@ -68,7 +74,9 @@ export default function SprintBacklogPage({
     useSprintBacklogView(
       effectiveProjectId || null,
       selectedSprintId,
-      selectedSprint
+      selectedSprint,
+      project?.members ?? [],
+      !sprintsLoading
     );
 
   const runWithRefetch = useCallback(
@@ -210,7 +218,43 @@ export default function SprintBacklogPage({
       .sort((left, right) => right.estimatedHours - left.estimatedHours);
   }, [filteredStories, normalizedQuery]);
 
-  if (!sprints.length || !selectedSprintId) {
+  if (effectiveProjectId && sprintsLoading && sprints.length === 0) {
+    return (
+      <>
+        <InlineToast toast={toast} />
+        <ProjectShell
+          projectId={effectiveProjectId}
+          projectName={projectName}
+          projectOwnerName={projectOwnerName}
+          projectBadgeLabel={projectBadgeLabel}
+          activeNavItem="sprint-backlog"
+          pageTitle="Sprint Backlog"
+          pageSubtitle="Carregando sprints…"
+          currentUser={placeholderUser}
+          mainColumn={
+            <div className="af-surface-lg flex items-center justify-center bg-[#14121a]/70 px-4 py-8">
+              <p className="af-text-secondary text-sm">Carregando…</p>
+            </div>
+          }
+        />
+        <CreateSprintModal
+          projectId={effectiveProjectId}
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={async (sprint) => {
+            try {
+              await refetchSprints();
+              setSelectedSprintId(sprint.id);
+            } catch (e) {
+              showError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
+      </>
+    );
+  }
+
+  if (!sprintsLoading && (!sprints.length || !selectedSprintId)) {
     return (
       <>
         <InlineToast toast={toast} />
@@ -509,6 +553,21 @@ export default function SprintBacklogPage({
                           selectedSprintId!,
                           sprintItemId,
                           { title }
+                        );
+                      })
+                    }
+                    onUpdateTaskStatus={(
+                      sprintItemId: number,
+                      taskId: number,
+                      status: StoryTaskStatus,
+                    ) =>
+                      runWithRefetch(async () => {
+                        await updateTask(
+                          effectiveProjectId,
+                          selectedSprintId!,
+                          sprintItemId,
+                          taskId,
+                          { status }
                         );
                       })
                     }

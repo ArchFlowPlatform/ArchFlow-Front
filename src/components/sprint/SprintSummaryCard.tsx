@@ -14,7 +14,7 @@ interface SprintSummaryCardProps {
   remainingHours: number;
   periodLabel: string;
   onCreateSprint?: () => void;
-  /** When provided, status badge becomes inline-editable (PATCH sprint `status`). */
+  /** When provided, status badge becomes inline-editable (`transitionSprintStatus`: POST activate/close/cancel, PATCH planned). */
   onSprintStatusChange?: (next: SprintStatus) => Promise<void>;
   statusSaving?: boolean;
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import StoryTaskRow from "./StoryTaskRow";
 import type { SprintBacklogStoryView } from "@/features/projects/mocks/sprintBacklog.mock";
+import type { StoryTaskStatus } from "@/lib/story-task-status";
 import UserAvatar from "../ui/UserAvatar";
 
 interface StorySprintCardProps {
@@ -11,6 +12,11 @@ interface StorySprintCardProps {
   mutating: boolean;
   onRemoveFromSprint: (sprintItemId: number) => Promise<void>;
   onCreateTask: (sprintItemId: number, title: string) => Promise<void>;
+  onUpdateTaskStatus: (
+    sprintItemId: number,
+    taskId: number,
+    status: StoryTaskStatus
+  ) => Promise<void>;
   onDeleteTask: (sprintItemId: number, taskId: number) => Promise<void>;
 }
 
@@ -19,6 +25,7 @@ export default function StorySprintCard({
   mutating,
   onRemoveFromSprint,
   onCreateTask,
+  onUpdateTaskStatus,
   onDeleteTask,
 }: StorySprintCardProps) {
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -93,6 +100,7 @@ export default function StorySprintCard({
               task={task}
               sprintItemId={story.sprintItemId}
               mutating={mutating}
+              onUpdateTaskStatus={onUpdateTaskStatus}
               onDeleteTask={onDeleteTask}
             />
           ))}

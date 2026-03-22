@@ -15,7 +15,7 @@ import { useSprintViewModel } from "../hooks/useSprintViewModel";
 import CreateSprintModal from "@/components/sprint/CreateSprintModal";
 import InlineToast from "@/components/ui/InlineToast";
 import { useToast } from "@/hooks/useToast";
-import { updateSprint } from "@/features/sprints/api/sprints.api";
+import { transitionSprintStatus } from "@/features/sprints/api/sprints.api";
 import type { SprintStatus } from "@/types/enums";
 
 interface SprintPageProps {
@@ -94,12 +94,14 @@ export default function SprintPage({ projectId }: SprintPageProps) {
 
   const handleSprintStatusChange = useCallback(
     async (next: SprintStatus) => {
-      if (!selectedSprintId) return;
+      if (!selectedSprintId || selectedSprint?.status === next) return;
       setSprintStatusSaving(true);
       try {
-        await updateSprint(effectiveProjectId, selectedSprintId, {
-          status: next,
-        });
+        await transitionSprintStatus(
+          effectiveProjectId,
+          selectedSprintId,
+          next,
+        );
         await refetchSprints();
         showSuccess("Status atualizado", "O status da sprint foi salvo.");
       } catch (e) {
@@ -111,6 +113,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
     [
       effectiveProjectId,
       selectedSprintId,
+      selectedSprint,
       refetchSprints,
       showError,
       showSuccess,

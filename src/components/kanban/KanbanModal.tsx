@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Paperclip, Tag, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Paperclip, Plus, Tag, Trash2, X } from "lucide-react";
 
 import type { KanbanCardView } from "@/features/projects/mocks/kanban.mock";
 import { getCardSystemBadges } from "@/features/projects/mocks/kanban.mock";
@@ -15,11 +15,23 @@ import { useLabels } from "@/features/labels/hooks/useLabels";
 import { createComment, deleteComment } from "@/features/card-comments/api/card-comments.api";
 import { addLabelToCard, removeLabelFromCard } from "@/features/card-labels/api/card-labels.api";
 import { createAttachment, deleteAttachment } from "@/features/card-attachments/api/card-attachments.api";
+import { createLabel } from "@/features/labels/api/labels.api";
+import {
+  createTask,
+  deleteTask,
+  updateTask,
+} from "@/features/story-tasks/api/story-tasks.api";
+import { useStoryTasks } from "@/features/story-tasks/hooks/useStoryTasks";
 import { useProject } from "@/features/projects/hooks/useProject";
 import type { User } from "@/types/user";
 import UserAvatar from "../ui/UserAvatar";
 import SystemBadge from "./SystemBadge";
 import UserLabelBadge from "./UserLabelBadge";
+import TaskStatusSelect from "@/components/tasks/TaskStatusSelect";
+import {
+  normalizeStoryTaskStatus,
+  type StoryTaskStatus,
+} from "@/lib/story-task-status";
 
 function formatDateTime(dateISO: string): string {
   return new Date(dateISO).toLocaleString("pt-BR", {
@@ -47,6 +59,8 @@ function resolveUser(userId: string, members: { user?: User }[]): User {
 
 interface KanbanModalProps {
   projectId?: string;
+  /** Current sprint (board scope); required for sprint-item tasks. */
+  sprintId?: string | null;
   card: KanbanCardView | null;
   onClose: () => void;
   onRefetch?: () => void;
@@ -54,6 +68,7 @@ interface KanbanModalProps {
 
 export default function KanbanModal({
   projectId,
+  sprintId,
   card,
   onClose,
   onRefetch,
@@ -70,6 +85,7 @@ export default function KanbanModal({
   } = useCardComments(pid, cardId);
   const {
     cardLabels: apiCardLabels,
+    loading: cardLabelsLoading,
     refetch: refetchCardLabels,
   } = useCardLabels(pid, cardId);
   const {
@@ -77,25 +93,46 @@ export default function KanbanModal({
     refetch: refetchAttachments,
   } = useCardAttachments(pid, cardId);
   const { activities: apiActivities } = useCardActivities(pid, cardId);
-  const { labels: projectLabels } = useLabels(pid);
+  const { labels: projectLabels, refetch: refetchProjectLabels } = useLabels(pid);
+
+  const sprintItemIdForTasks = card?.sprintItemId ?? null;
+  const {
+    tasks: storyTasks,
+    loading: storyTasksLoading,
+    refetch: refetchStoryTasks,
+  } = useStoryTasks(pid, sprintId ?? null, sprintItemIdForTasks);
 
   const [newCommentContent, setNewCommentContent] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [mutating, setMutating] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState("#8b5cf6");
+  const [labelComposerOpen, setLabelComposerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const displayUserLabels =
-    apiCardLabels.length > 0
-      ? apiCardLabels.map((cl) => ({
-          id: String(cl.id),
-          labelId: cl.labelId,
-          name: cl.label?.name ?? "—",
-          color: cl.label?.color ?? "#666",
-        }))
-      : (card?.userLabels ?? []).map((l) => ({
-          ...l,
-          labelId: Number(l.id),
-        }));
+  const displayUserLabels = useMemo(() => {
+    const fromApi = apiCardLabels.map((cl) => {
+      const pl = projectLabels.find((l) => l.id === cl.labelId);
+      return {
+        id: String(cl.id),
+        labelId: cl.labelId,
+        name: cl.label?.name ?? pl?.name ?? "—",
+        color: cl.label?.color ?? pl?.color ?? "#666",
+        removable: true as const,
+      };
+    });
+    if (fromApi.length > 0) return fromApi;
+    const fromBoard = (card?.userLabels ?? []).map((l) => ({
+      id: l.id,
+      labelId: Number.NaN,
+      name: l.name,
+      color: l.color,
+      removable: false as const,
+    }));
+    if (cardLabelsLoading) return fromBoard;
+    return fromBoard;
+  }, [apiCardLabels, projectLabels, card?.userLabels, cardLabelsLoading]);
 
   const attachedLabelIds = new Set(apiCardLabels.map((cl) => cl.labelId));
   const availableLabels = projectLabels.filter(
@@ -153,13 +190,14 @@ export default function KanbanModal({
       try {
         await addLabelToCard(projectId, cardId, { labelId });
         await refetchCardLabels();
+        onRefetch?.();
       } catch {
         // silent
       } finally {
         setMutating(false);
       }
     },
-    [projectId, cardId, refetchCardLabels]
+    [projectId, cardId, refetchCardLabels, onRefetch]
   );
 
   const handleRemoveLabel = useCallback(
@@ -169,13 +207,14 @@ export default function KanbanModal({
       try {
         await removeLabelFromCard(projectId, cardId, cardLabelId);
         await refetchCardLabels();
+        onRefetch?.();
       } catch {
         // silent
       } finally {
         setMutating(false);
       }
     },
-    [projectId, cardId, refetchCardLabels]
+    [projectId, cardId, refetchCardLabels, onRefetch]
   );
 
   const handleUploadAttachment = useCallback(
@@ -212,6 +251,99 @@ export default function KanbanModal({
     [projectId, cardId, refetchAttachments]
   );
 
+  const handleAddStoryTask = useCallback(async () => {
+    if (!projectId || !sprintId || sprintItemIdForTasks == null) return;
+    const t = newTaskTitle.trim();
+    if (!t) return;
+    setMutating(true);
+    try {
+      await createTask(projectId, sprintId, sprintItemIdForTasks, { title: t });
+      setNewTaskTitle("");
+      await refetchStoryTasks();
+      onRefetch?.();
+    } catch {
+      // silent
+    } finally {
+      setMutating(false);
+    }
+  }, [
+    projectId,
+    sprintId,
+    sprintItemIdForTasks,
+    newTaskTitle,
+    refetchStoryTasks,
+    onRefetch,
+  ]);
+
+  const handleStoryTaskStatusChange = useCallback(
+    async (taskId: number, next: StoryTaskStatus) => {
+      if (!projectId || !sprintId || sprintItemIdForTasks == null) return;
+      setMutating(true);
+      try {
+        await updateTask(projectId, sprintId, sprintItemIdForTasks, taskId, {
+          status: next,
+        });
+        await refetchStoryTasks();
+        onRefetch?.();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
+      }
+    },
+    [projectId, sprintId, sprintItemIdForTasks, refetchStoryTasks, onRefetch]
+  );
+
+  const handleDeleteStoryTask = useCallback(
+    async (taskId: number) => {
+      if (!projectId || !sprintId || sprintItemIdForTasks == null) return;
+      setMutating(true);
+      try {
+        await deleteTask(projectId, sprintId, sprintItemIdForTasks, taskId);
+        await refetchStoryTasks();
+        onRefetch?.();
+      } catch {
+        // silent
+      } finally {
+        setMutating(false);
+      }
+    },
+    [projectId, sprintId, sprintItemIdForTasks, refetchStoryTasks, onRefetch]
+  );
+
+  const handleCreateAndAttachLabel = useCallback(async () => {
+    if (!projectId || cardId == null) return;
+    const name = newLabelName.trim();
+    if (!name) return;
+    setMutating(true);
+    try {
+      const created = await createLabel(projectId, { name, color: newLabelColor });
+      await addLabelToCard(projectId, cardId, { labelId: created.id });
+      setNewLabelName("");
+      setLabelComposerOpen(false);
+      await refetchProjectLabels();
+      await refetchCardLabels();
+      onRefetch?.();
+    } catch {
+      // silent
+    } finally {
+      setMutating(false);
+    }
+  }, [
+    projectId,
+    cardId,
+    newLabelName,
+    newLabelColor,
+    refetchProjectLabels,
+    refetchCardLabels,
+    onRefetch,
+  ]);
+
+  useEffect(() => {
+    setLabelComposerOpen(false);
+    setNewLabelName("");
+  }, [card?.id]);
+
   useEffect(() => {
     if (!card) return;
     function handleKeyDown(event: KeyboardEvent) {
@@ -225,11 +357,11 @@ export default function KanbanModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]">
-      <div className="af-surface-lg max-h-[90vh] w-full max-w-6xl overflow-hidden bg-[#14121a]/96">
-        <div className="grid max-h-[90vh] min-h-0 gap-0 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,0.85fr)]">
+      <div className="af-surface-lg flex max-h-[min(92dvh,900px)] w-full max-w-6xl flex-col overflow-hidden bg-[#14121a]/96">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,0.85fr)]">
           {/* ───── LEFT: card detail ───── */}
-          <section className="min-h-0 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
-            <header className="af-separator-b pb-4">
+          <section className="flex min-h-0 flex-col overflow-hidden border-b border-white/8 lg:border-b-0 lg:border-r">
+            <header className="shrink-0 px-4 pb-4 pt-4 sm:px-5 sm:pt-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 space-y-3">
                   <h2 className="text-lg font-semibold text-white">
@@ -237,26 +369,34 @@ export default function KanbanModal({
                   </h2>
                   {displayUserLabels.length ? (
                     <div className="flex flex-wrap gap-1.5">
-                      {displayUserLabels.map((label) => (
-                        <button
-                          key={label.id}
-                          type="button"
-                          disabled={mutating}
-                          onClick={() =>
-                            handleRemoveLabel(Number(label.id))
-                          }
-                          className="group relative"
-                          title="Click to remove"
-                        >
+                      {displayUserLabels.map((label) =>
+                        label.removable ? (
+                          <button
+                            key={label.id}
+                            type="button"
+                            disabled={mutating}
+                            onClick={() =>
+                              void handleRemoveLabel(Number(label.id))
+                            }
+                            className="group relative"
+                            title="Remover label"
+                          >
+                            <UserLabelBadge
+                              name={label.name}
+                              color={label.color}
+                            />
+                            <span className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] text-white group-hover:inline-flex">
+                              ×
+                            </span>
+                          </button>
+                        ) : (
                           <UserLabelBadge
+                            key={label.id}
                             name={label.name}
                             color={label.color}
                           />
-                          <span className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] text-white group-hover:inline-flex">
-                            ×
-                          </span>
-                        </button>
-                      ))}
+                        ),
+                      )}
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-1.5">
@@ -282,7 +422,8 @@ export default function KanbanModal({
               </div>
             </header>
 
-            <div className="mt-4 space-y-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5 sm:pb-5">
+            <div className="space-y-5">
               <section className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
                   Descrição do card
@@ -357,38 +498,108 @@ export default function KanbanModal({
               <section className="space-y-2">
                 <div className="af-separator-b pb-1">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                    Tasks
+                    Tasks (sprint item)
                   </p>
                 </div>
-                <div className="space-y-2">
-                  {(card.tasks ?? []).map((task) => (
-                    <div
-                      key={task.id}
-                      className="af-surface-md flex items-start justify-between gap-3 bg-white/[0.03] px-3 py-3"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-sm text-white">{task.title}</h4>
-                          <SystemBadge className="h-6 py-0 leading-none">
-                            {task.priority}
-                          </SystemBadge>
+                {!sprintId || sprintItemIdForTasks == null ? (
+                  <p className="af-text-tertiary text-[11px] leading-relaxed">
+                    Inclua esta user story como item da sprint atual no sprint
+                    backlog para criar e acompanhar tarefas (mesma API do sprint
+                    item).
+                  </p>
+                ) : storyTasksLoading ? (
+                  <p className="af-text-tertiary text-[11px]">Carregando tarefas…</p>
+                ) : (
+                  <div className="flex max-h-[min(40vh,280px)] flex-col gap-2">
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+                    {storyTasks.length === 0 ? (
+                      <p className="af-text-tertiary text-[11px]">
+                        Nenhuma tarefa ainda. Adicione abaixo (mesmas tarefas do
+                        sprint backlog).
+                      </p>
+                    ) : null}
+                    {storyTasks.map((task) => {
+                      const assignee = resolveUser(
+                        task.assigneeId ?? "",
+                        members,
+                      );
+                      const status = normalizeStoryTaskStatus(task.status);
+                      return (
+                        <div
+                          key={task.id}
+                          className="af-surface-md flex flex-col gap-3 bg-white/[0.03] px-3 py-3 sm:flex-row sm:items-center"
+                        >
+                          <TaskStatusSelect
+                            value={status}
+                            disabled={mutating}
+                            onChange={(next) =>
+                              void handleStoryTaskStatusChange(task.id, next)
+                            }
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4
+                                className={`text-sm ${
+                                  status === 2
+                                    ? "text-white/45 line-through"
+                                    : status === 1
+                                      ? "text-amber-100/95"
+                                      : "text-white"
+                                }`}
+                              >
+                                {task.title}
+                              </h4>
+                            </div>
+                            <p className="af-text-tertiary text-[11px]">
+                              {assignee.name}
+                              {task.estimatedHours != null
+                                ? ` · ${task.estimatedHours}h`
+                                : ""}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={mutating}
+                            aria-label="Excluir tarefa"
+                            onClick={() => void handleDeleteStoryTask(task.id)}
+                            className="af-focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/35 transition hover:bg-red-500/15 hover:text-red-400 disabled:opacity-30"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                          </button>
                         </div>
-                        <p className="af-text-tertiary text-[11px]">
-                          {task.assignee.name}
-                        </p>
-                      </div>
-                      <span className="af-surface-sm inline-flex h-6 shrink-0 items-center bg-black/30 px-2 py-0 text-[10px] leading-none text-white/72">
-                        {task.doneHours}h / {task.estimatedHours}h
-                      </span>
+                      );
+                    })}
                     </div>
-                  ))}
-                </div>
+                    <div className="shrink-0 flex flex-col gap-2 border-t border-white/8 pt-2 sm:flex-row sm:items-center">
+                      <input
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void handleAddStoryTask();
+                        }}
+                        disabled={mutating}
+                        placeholder="Nova tarefa…"
+                        className="af-focus-ring min-w-0 flex-1 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30"
+                      />
+                      <button
+                        type="button"
+                        disabled={mutating || !newTaskTitle.trim()}
+                        onClick={() => void handleAddStoryTask()}
+                        className="af-focus-ring af-surface-md shrink-0 px-3 py-2 text-xs font-medium text-white/85 transition hover:bg-white/[0.06] disabled:opacity-40"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
+            </div>
             </div>
           </section>
 
           {/* ───── RIGHT: sidebar (comments, labels, attachments, activity) ───── */}
-          <aside className="af-separator-t min-h-0 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5 lg:border-t-0 lg:border-l lg:border-white/8 lg:shadow-[inset_1px_0_0_rgba(255,255,255,0.03)]">
+          <aside className="af-separator-t flex min-h-0 flex-col overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5 lg:border-t-0 lg:border-l lg:border-white/8 lg:shadow-[inset_1px_0_0_rgba(255,255,255,0.03)]">
             <div className="space-y-4">
               {/* Assignee / meta */}
               <section className="af-surface-lg bg-white/[0.02] px-4 py-4">
@@ -455,42 +666,62 @@ export default function KanbanModal({
                   </div>
                 </header>
                 <div className="mt-3 space-y-2">
-                  {displayUserLabels.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {displayUserLabels.map((label) => (
-                        <button
-                          key={label.id}
-                          type="button"
-                          disabled={mutating}
-                          onClick={() =>
-                            handleRemoveLabel(Number(label.id))
-                          }
-                          className="group relative"
-                          title="Click to remove label"
-                        >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {displayUserLabels.length > 0 ? (
+                      displayUserLabels.map((label) =>
+                        label.removable ? (
+                          <button
+                            key={label.id}
+                            type="button"
+                            disabled={mutating}
+                            onClick={() =>
+                              void handleRemoveLabel(Number(label.id))
+                            }
+                            className="group relative"
+                            title="Remover label"
+                          >
+                            <UserLabelBadge
+                              name={label.name}
+                              color={label.color}
+                            />
+                            <span className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] text-white group-hover:inline-flex">
+                              ×
+                            </span>
+                          </button>
+                        ) : (
                           <UserLabelBadge
+                            key={label.id}
                             name={label.name}
                             color={label.color}
                           />
-                          <span className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] text-white group-hover:inline-flex">
-                            ×
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="af-text-tertiary text-[11px]">
-                      Nenhuma label adicionada.
-                    </p>
-                  )}
+                        ),
+                      )
+                    ) : (
+                      <p className="af-text-tertiary text-[11px]">
+                        Nenhuma label adicionada.
+                      </p>
+                    )}
+                    {projectId ? (
+                      <button
+                        type="button"
+                        disabled={mutating}
+                        onClick={() => setLabelComposerOpen((o) => !o)}
+                        className="af-focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-dashed border-white/20 text-white/55 transition hover:border-white/35 hover:text-white/85 disabled:opacity-40"
+                        title="Nova label"
+                        aria-expanded={labelComposerOpen}
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
                   {availableLabels.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
+                    <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto overscroll-contain pt-1">
                       {availableLabels.map((label) => (
                         <button
                           key={label.id}
                           type="button"
                           disabled={mutating}
-                          onClick={() => handleAddLabel(label.id)}
+                          onClick={() => void handleAddLabel(label.id)}
                           className="af-focus-ring inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/60 transition hover:border-white/20 hover:text-white/80 disabled:opacity-40"
                         >
                           <span
@@ -500,6 +731,53 @@ export default function KanbanModal({
                           {label.name}
                         </button>
                       ))}
+                    </div>
+                  ) : null}
+                  {projectId && labelComposerOpen ? (
+                    <div className="af-separator-t border-white/8 pt-3">
+                      <div className="flex flex-wrap items-end gap-2">
+                        <input
+                          type="text"
+                          value={newLabelName}
+                          onChange={(e) => setNewLabelName(e.target.value)}
+                          disabled={mutating}
+                          placeholder="Nome da label"
+                          className="af-focus-ring min-w-[8rem] flex-1 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white placeholder:text-white/30"
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setLabelComposerOpen(false);
+                              setNewLabelName("");
+                            }
+                          }}
+                        />
+                        <input
+                          type="color"
+                          value={newLabelColor}
+                          onChange={(e) => setNewLabelColor(e.target.value)}
+                          disabled={mutating}
+                          className="h-9 w-11 shrink-0 cursor-pointer rounded border border-white/10 bg-transparent"
+                          aria-label="Cor da label"
+                        />
+                        <button
+                          type="button"
+                          disabled={mutating || !newLabelName.trim()}
+                          onClick={() => void handleCreateAndAttachLabel()}
+                          className="af-focus-ring af-surface-md shrink-0 px-3 py-1.5 text-xs font-medium text-white/85 transition hover:bg-white/[0.06] disabled:opacity-40"
+                        >
+                          Criar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={mutating}
+                          onClick={() => {
+                            setLabelComposerOpen(false);
+                            setNewLabelName("");
+                          }}
+                          className="af-focus-ring shrink-0 px-2 py-1.5 text-xs text-white/50 transition hover:text-white/80"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -528,6 +806,7 @@ export default function KanbanModal({
                     <p className="af-text-tertiary text-[11px]">Carregando…</p>
                   ) : null}
 
+                  <div className="max-h-56 space-y-2.5 overflow-y-auto overscroll-contain pr-0.5">
                   {displayComments.map((comment) => (
                     <article
                       key={comment.id}
@@ -569,13 +848,14 @@ export default function KanbanModal({
                       </p>
                     </article>
                   ))}
+                  </div>
 
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       void handleAddComment();
                     }}
-                    className="mt-3 space-y-2"
+                    className="mt-3 shrink-0 space-y-2"
                   >
                     <textarea
                       value={newCommentContent}

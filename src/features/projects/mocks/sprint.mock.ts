@@ -1,4 +1,5 @@
 import { USE_MOCKS } from "@/lib/env";
+import type { StoryTaskStatus } from "@/lib/story-task-status";
 import type { User } from "@/types/user";
 
 type SprintStatus = "planned" | "active" | "completed" | "cancelled";
@@ -47,6 +48,8 @@ export interface SprintTaskView {
   estimatedHours: number;
   doneHours: number;
   priorityLabel: PriorityLabel;
+  /** StoryTaskStatus: Todo = 0, Doing = 1, Done = 2 */
+  status: StoryTaskStatus;
 }
 
 export interface BurndownPoint {
@@ -159,6 +162,7 @@ export function buildMockSprintView(
     estimatedHours: t.estimatedHours,
     doneHours: t.actualHours,
     priorityLabel: prioLabel(t.priority),
+    status: 0,
   }));
 
   const scopeHours = taskViews.reduce((s, t) => s + t.estimatedHours, 0);

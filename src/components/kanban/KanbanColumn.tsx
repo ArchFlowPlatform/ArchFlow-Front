@@ -12,6 +12,8 @@ interface KanbanColumnProps {
   onDragStartCard: (cardId: string) => void;
   onDragEndCard: () => void;
   onDropCard: (cardId: string, columnId: KanbanColumnView["id"]) => void;
+  /** Open create-card flow for this column (uses backend column id). */
+  onRequestAddCard?: (backendColumnId: number) => void;
 }
 
 export default function KanbanColumn({
@@ -21,6 +23,7 @@ export default function KanbanColumn({
   onDragStartCard,
   onDragEndCard,
   onDropCard,
+  onRequestAddCard,
 }: KanbanColumnProps) {
   const [isOver, setIsOver] = useState(false);
 
@@ -79,10 +82,16 @@ export default function KanbanColumn({
       <footer className="af-separator-t px-3 py-3">
         <button
           type="button"
-          className="af-focus-ring af-accent-hover af-text-secondary inline-flex w-full items-center gap-2 px-2 py-2 text-[11px] transition hover:bg-white/[0.03] hover:text-[var(--accent-soft-35)]"
+          disabled={!onRequestAddCard || column.backendColumnId == null}
+          onClick={() => {
+            if (column.backendColumnId != null) {
+              onRequestAddCard?.(column.backendColumnId);
+            }
+          }}
+          className="af-focus-ring af-accent-hover af-text-secondary inline-flex w-full items-center gap-2 px-2 py-2 text-[11px] transition hover:bg-white/[0.03] hover:text-[var(--accent-soft-35)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="af-accent-icon h-3.5 w-3.5" aria-hidden="true" />
-          <span>Adicionar um card</span>
+          <span>Adicionar card</span>
         </button>
       </footer>
     </section>

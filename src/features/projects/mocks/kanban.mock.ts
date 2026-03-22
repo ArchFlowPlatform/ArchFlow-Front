@@ -54,6 +54,10 @@ export interface KanbanUserLabelView {
 
 export interface KanbanCardView {
   id: string;
+  /** Board card ↔ user story (API). */
+  userStoryId?: number;
+  /** Sprint item for story-task APIs (same sprint as board). */
+  sprintItemId?: number | null;
   title: string;
   persona: string;
   description: string;
@@ -123,7 +127,10 @@ function formatPriorityTone(priority: UserStoryPriority): string {
 export function buildKanbanColumns(
   cards: KanbanCardView[],
   columnMeta: Array<
-    Pick<KanbanColumnView, "id" | "title" | "wipLimitHours" | "helpText">
+    Pick<
+      KanbanColumnView,
+      "id" | "title" | "wipLimitHours" | "helpText" | "backendColumnId"
+    >
   >,
 ): KanbanColumnView[] {
   return columnMeta.map((column) => {

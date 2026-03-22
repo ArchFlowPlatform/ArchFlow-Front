@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Sprint } from "@/types/sprint";
 import type { UserStory } from "@/types/backlog";
 import type { User } from "@/types/user";
+import { normalizeStoryTaskStatus } from "@/lib/story-task-status";
 import { resolveUsersByIdCached } from "@/lib/users/resolve-assignee-names";
 import { getTasks } from "@/features/story-tasks/api/story-tasks.api";
 import { useSprintItems } from "@/features/sprint-items/hooks/useSprintItems";
 import { useBacklog } from "@/features/backlog/hooks/useBacklog";
-import { useProject } from "@/features/projects/hooks/useProject";
 import type {
   AssigneeWorkloadView,
   SprintBacklogStoryView,
@@ -17,6 +17,12 @@ import type {
 } from "../mocks/sprintBacklog.mock";
 
 type PriorityLabel = "P1" | "P2" | "P3";
+
+function isAbortLike(e: unknown): boolean {
+  if (typeof e !== "object" || e === null) return false;
+  const o = e as { code?: string; name?: string };
+  return o.code === "ERR_CANCELED" || o.name === "CanceledError";
+}
 
 function priorityNumberToLabel(priority: number): PriorityLabel {
   if (priority <= 1) return "P1";
@@ -74,22 +80,28 @@ export interface UseSprintBacklogViewResult {
 }
 
 /**
- * Step 6: `useSprintItems` + `getTasks` per item + backlog/project for labels/assignees.
+ * Step 6: `useSprintItems` + `getTasks` per item + backlog for labels/assignees.
+ * Pass `members` from the page (single `useProject` per screen) to avoid duplicate
+ * `/projects/:id` + `/members` calls. `sprintListReady` gates loading until sprints resolve.
  */
 export function useSprintBacklogView(
   projectId: string | null,
   sprintId: string | null,
-  sprint: Sprint | null
+  sprint: Sprint | null,
+  members: { user?: User }[],
+  sprintListReady: boolean
 ): UseSprintBacklogViewResult {
   const { items, loading: itemsLoading, error: itemsError, refetch: refetchItems } = useSprintItems(projectId, sprintId);
-  const { backlog, loading: backlogLoading } = useBacklog(projectId);
-  const { project } = useProject(projectId);
+  const {
+    backlog,
+    loading: backlogLoading,
+    refetch: refetchBacklog,
+  } = useBacklog(projectId);
 
   const [tasksByItemId, setTasksByItemId] = useState<Record<number, import("@/types/sprint").StoryTask[]>>({});
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState<Error | null>(null);
 
-  const members = project?.members ?? [];
   const [resolvedUsersById, setResolvedUsersById] = useState<Record<string, User>>({});
   const [assigneesLoading, setAssigneesLoading] = useState(false);
   const epics = backlog?.epics ?? [];
@@ -125,14 +137,15 @@ export function useSprintBacklogView(
     let cancelled = false;
 
     async function run(): Promise<void> {
-      if (assigneeIdsToResolve.length === 0) {
+      const ids = assigneeIdsKey ? assigneeIdsKey.split("|").filter(Boolean) : [];
+      if (ids.length === 0) {
         setAssigneesLoading(false);
         return;
       }
 
       setAssigneesLoading(true);
       try {
-        const resolved = await resolveUsersByIdCached(assigneeIdsToResolve);
+        const resolved = await resolveUsersByIdCached(ids);
         if (cancelled) return;
         setResolvedUsersById((prev) => ({ ...prev, ...resolved }));
       } finally {
@@ -145,20 +158,39 @@ export function useSprintBacklogView(
     return () => {
       cancelled = true;
     };
-  }, [assigneeIdsKey, assigneeIdsToResolve]);
+  }, [assigneeIdsKey]);
 
-  const fetchTasksForItems = useCallback(
-    async (itemIds: number[]) => {
-      if (!projectId || !sprintId || itemIds.length === 0) {
-        setTasksByItemId({});
-        return;
-      }
-      setTasksLoading(true);
+  const itemIdsKey = useMemo(
+    () =>
+      [...items]
+        .map((i) => i.id)
+        .sort((a, b) => a - b)
+        .join(","),
+    [items]
+  );
+
+  useEffect(() => {
+    if (!projectId || !sprintId || itemIdsKey === "") {
+      setTasksByItemId({});
+      setTasksLoading(false);
       setTasksError(null);
+      return;
+    }
+
+    const itemIds = itemIdsKey.split(",").map((s) => Number(s));
+    const ac = new AbortController();
+
+    setTasksLoading(true);
+    setTasksError(null);
+
+    void (async () => {
       try {
         const results = await Promise.all(
           itemIds.map((itemId) =>
-            getTasks(projectId, sprintId, itemId).then((tasks) => ({ itemId, tasks }))
+            getTasks(projectId, sprintId, itemId, ac.signal).then((tasks) => ({
+              itemId,
+              tasks,
+            }))
           )
         );
         const map: Record<number, import("@/types/sprint").StoryTask[]> = {};
@@ -167,26 +199,22 @@ export function useSprintBacklogView(
         }
         setTasksByItemId(map);
       } catch (e) {
+        if (isAbortLike(e)) return;
         setTasksByItemId({});
         setTasksError(e instanceof Error ? e : new Error(String(e)));
       } finally {
-        setTasksLoading(false);
+        if (!ac.signal.aborted) {
+          setTasksLoading(false);
+        }
       }
-    },
-    [projectId, sprintId]
-  );
+    })();
 
-  useEffect(() => {
-    if (items.length > 0) {
-      fetchTasksForItems(items.map((i) => i.id));
-    } else {
-      setTasksByItemId({});
-    }
-  }, [items, fetchTasksForItems]);
+    return () => ac.abort();
+  }, [itemIdsKey, projectId, sprintId]);
 
   const refetch = useCallback(async () => {
-    await refetchItems();
-  }, [refetchItems]);
+    await Promise.all([refetchItems(), refetchBacklog()]);
+  }, [refetchItems, refetchBacklog]);
 
   const availableBacklogStories = useMemo(() => {
     if (itemsLoading || itemsError || backlogLoading || !backlog) return [];
@@ -203,9 +231,12 @@ export function useSprintBacklogView(
     backlogLoading,
   ]);
 
+  const sprintMissing =
+    Boolean(sprintListReady && sprintId && !sprint);
+
   const view: SprintBacklogViewModel | null = (() => {
     if (!sprint || !projectId || !sprintId) return null;
-    if (itemsLoading || tasksLoading || assigneesLoading) return null;
+    if (itemsLoading || tasksLoading || assigneesLoading || backlogLoading) return null;
     if (itemsError || tasksError) return null;
 
     const stories: SprintBacklogStoryView[] = items
@@ -224,6 +255,7 @@ export function useSprintBacklogView(
             title: task.title,
             description: task.description ?? "",
             priorityLabel: priorityNumberToLabel(task.priority),
+            status: normalizeStoryTaskStatus(task.status),
             assignee: resolveUser(
               task.assigneeId,
               members,
@@ -325,8 +357,19 @@ export function useSprintBacklogView(
 
   return {
     view,
-    loading: itemsLoading || tasksLoading || assigneesLoading,
-    error: itemsError ?? tasksError,
+    loading:
+      !sprintMissing &&
+      (itemsLoading ||
+        tasksLoading ||
+        assigneesLoading ||
+        backlogLoading ||
+        !sprintListReady),
+    error:
+      itemsError ??
+      tasksError ??
+      (sprintMissing
+        ? new Error("Sprint não encontrada para este projeto.")
+        : null),
     refetch,
     availableBacklogStories,
   };

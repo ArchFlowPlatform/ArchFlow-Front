@@ -22,10 +22,12 @@ function tasksBase(
 export async function getTasks(
   projectId: string,
   sprintId: string,
-  sprintItemId: number
+  sprintItemId: number,
+  signal?: AbortSignal
 ): Promise<StoryTask[]> {
   const response = await get<StoryTask[]>(
-    tasksBase(projectId, sprintId, sprintItemId)
+    tasksBase(projectId, sprintId, sprintItemId),
+    signal ? { signal } : undefined
   );
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message ?? "Failed to fetch tasks");

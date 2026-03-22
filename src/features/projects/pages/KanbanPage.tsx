@@ -7,6 +7,8 @@ import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
 import ProjectEmptyState from "@/components/projects/ProjectEmptyState";
 import InlineToast from "@/components/ui/InlineToast";
+import AddBoardColumnModal from "@/components/kanban/AddBoardColumnModal";
+import AddKanbanCardModal from "@/components/kanban/AddKanbanCardModal";
 import KanbanColumn from "@/components/kanban/KanbanColumn";
 import KanbanModal from "@/components/kanban/KanbanModal";
 import { authUserToUser } from "@/features/auth/types/auth.types";
@@ -39,6 +41,8 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
+  const [addColumnOpen, setAddColumnOpen] = useState(false);
+  const [addCardColumnId, setAddCardColumnId] = useState<number | null>(null);
   const { toast, showToast } = useToast();
   const [cardState, setCardState] = useState<KanbanBoardCardState[]>([]);
 
@@ -48,7 +52,7 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
   const { sprints, selectedSprintId, selectedSprint } = useProjectSprint(
     effectiveProjectId || ""
   );
-  const { view, loading, error, refetch } = useKanbanBoardView(
+  const { view, loading, error, refetch, sprintItems } = useKanbanBoardView(
     effectiveProjectId || null,
     selectedSprintId,
     selectedSprint
@@ -63,12 +67,15 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
   const columnMeta = useMemo(
     () =>
       baseBoard
-        ? baseBoard.columns.map(({ id, title, wipLimitHours, helpText }) => ({
-            id,
-            title,
-            wipLimitHours,
-            helpText,
-          }))
+        ? baseBoard.columns.map(
+            ({ id, title, wipLimitHours, helpText, backendColumnId }) => ({
+              id,
+              title,
+              wipLimitHours,
+              helpText,
+              backendColumnId,
+            }),
+          )
         : [],
     [baseBoard]
   );
@@ -99,6 +106,15 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
     () => buildKanbanColumns(filteredCards, columnMeta),
     [columnMeta, filteredCards]
   );
+
+  /** User stories that already have a board card (avoid duplicate links). */
+  const occupiedUserStoryIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const c of boardCards) {
+      if (c.userStoryId != null) ids.add(c.userStoryId);
+    }
+    return ids;
+  }, [boardCards]);
 
   const fullBoardForCard = useMemo(
     () =>
@@ -290,19 +306,34 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
       onSearchChange={(v) => setSearchTerm(v)}
       fullWidthMain
       mainColumn={
-        (baseBoard?.allCards?.length ?? 0) === 0 ? (
-          <ProjectEmptyState
-            title="No cards available."
-            description="This sprint board is empty. Add cards to start tracking stories and task flow."
-            actionLabel="Add card"
-          />
-        ) : (
-          <>
-            <InlineToast toast={toast} />
+        <>
+          <InlineToast toast={toast} />
 
-            <section className="min-h-0">
-              <div className="overflow-x-auto overflow-y-hidden pb-2">
-                <div className="flex min-h-[calc(100dvh-14rem)] items-stretch gap-3">
+          <section className="flex min-h-0 flex-col gap-4">
+            {!filteredColumns.length ? (
+              <div className="af-surface-lg bg-[#14121a]/70 px-4 py-8 text-center sm:px-6">
+                <p className="text-sm font-medium text-white">
+                  Nenhuma coluna neste board
+                </p>
+                <p className="af-text-secondary mt-2 text-xs">
+                  Crie uma coluna para organizar o fluxo. Depois, adicione cards
+                  em cada coluna.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAddColumnOpen(true)}
+                  className="af-focus-ring af-accent-hover af-surface-md mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm text-white/90 transition"
+                >
+                  <Plus className="af-accent-icon h-4 w-4" aria-hidden="true" />
+                  Adicionar coluna
+                </button>
+              </div>
+            ) : null}
+
+            {filteredColumns.length > 0 ? (
+              <div className="flex max-h-[calc(100dvh-11rem)] min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden pb-2">
+                <div className="flex h-full min-h-[min(100%,420px)] items-stretch gap-3">
                   {filteredColumns.map((column) => (
                     <KanbanColumn
                       key={column.id}
@@ -312,6 +343,9 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
                       onDragStartCard={setDraggingCardId}
                       onDragEndCard={() => setDraggingCardId(null)}
                       onDropCard={handleDropCard}
+                      onRequestAddCard={(backendColumnId) =>
+                        setAddCardColumnId(backendColumnId)
+                      }
                     />
                   ))}
 
@@ -319,28 +353,51 @@ export default function KanbanPage({ projectId }: KanbanPageProps) {
                     <div className="af-separator-b px-3 py-3">
                       <button
                         type="button"
+                        onClick={() => setAddColumnOpen(true)}
                         className="af-focus-ring af-accent-hover af-text-secondary inline-flex w-full items-center gap-2 px-2 py-2 text-sm transition hover:bg-white/[0.03] hover:text-[var(--accent-soft-35)]"
                       >
                         <Plus
                           className="af-accent-icon h-4 w-4"
                           aria-hidden="true"
                         />
-                        <span>Adicionar outra coluna</span>
+                        <span>Adicionar coluna</span>
                       </button>
                     </div>
                   </section>
                 </div>
               </div>
-            </section>
+              </div>
+            ) : null}
+          </section>
 
-            <KanbanModal
-              projectId={effectiveProjectId}
-              card={selectedCard}
-              onClose={() => setSelectedCardId(null)}
-              onRefetch={() => void refetch()}
-            />
-          </>
-        )
+          <KanbanModal
+            projectId={effectiveProjectId}
+            sprintId={selectedSprintId}
+            card={selectedCard}
+            onClose={() => setSelectedCardId(null)}
+            onRefetch={() => void refetch()}
+          />
+
+          <AddBoardColumnModal
+            open={addColumnOpen}
+            onClose={() => setAddColumnOpen(false)}
+            projectId={effectiveProjectId}
+            sprintId={selectedSprintId}
+            onCreated={() => void refetch()}
+          />
+
+          <AddKanbanCardModal
+            open={addCardColumnId != null}
+            onClose={() => setAddCardColumnId(null)}
+            projectId={effectiveProjectId}
+            sprintId={selectedSprintId}
+            columnId={addCardColumnId}
+            sprintItems={sprintItems.filter(
+              (item) => !occupiedUserStoryIds.has(item.userStoryId)
+            )}
+            onCreated={() => void refetch()}
+          />
+        </>
       }
     />
   );
