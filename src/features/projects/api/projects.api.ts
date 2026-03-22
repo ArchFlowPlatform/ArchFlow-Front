@@ -53,7 +53,7 @@ export async function createProject(
   if (!response.success || !response.data) {
     throw new Error(response.message ?? "Failed to create project");
   }
-  return response.data;
+  return safeParseObject(ProjectSchema, response.data, "createProject");
 }
 
 export async function updateProject(

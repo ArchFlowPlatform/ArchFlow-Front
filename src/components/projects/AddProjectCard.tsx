@@ -19,7 +19,7 @@ export default function AddProjectCard({ onAdd }: AddProjectCardProps) {
         <Plus className="af-accent-icon h-4 w-4" aria-hidden="true" />
       </span>
       <span className="text-sm font-medium">Adicionar projeto</span>
-      <span className="af-text-tertiary text-[11px]">Preview</span>
+      <span className="af-text-tertiary text-[11px]">Criar novo</span>
     </button>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { FolderKanban, Layers2 } from "lucide-react";
 
 import AddProjectCard from "@/components/projects/AddProjectCard";
+import CreateProjectModal from "@/components/projects/CreateProjectModal";
 import AppSidebar from "@/components/layout/AppSidebar";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectsHeader from "@/components/projects/ProjectsHeader";
@@ -13,6 +14,10 @@ import { authUserToUser } from "@/features/auth/types/auth.types";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { logout } from "@/features/auth/api/auth.api";
 import { useAppNavigate } from "@/hooks/useAppNavigate";
+import {
+  DEFAULT_LOADING_DURATION_MS,
+  startTimedGlobalLoading,
+} from "@/hooks/useGlobalLoading";
 import { useProjects } from "../hooks/useProjects";
 
 const pageStyle: CSSProperties = {
@@ -33,7 +38,8 @@ const PLACEHOLDER_USER = {
 export default function ProjectsHubPage() {
   const { user, setUser } = useAuth();
   const { navigate } = useAppNavigate();
-  const { projects, loading, error } = useProjects();
+  const { projects, loading, error, refetch } = useProjects();
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const currentUserId = user?.id ?? "";
 
   const ownerProjects = projects.filter(
@@ -107,7 +113,9 @@ export default function ProjectsHubPage() {
                     {ownerProjects.map((project) => (
                       <ProjectCard key={project.id} project={project} />
                     ))}
-                    <AddProjectCard />
+                    <AddProjectCard
+                      onAdd={() => setCreateProjectOpen(true)}
+                    />
                   </SectionBlock>
 
                   <SectionBlock
@@ -125,6 +133,19 @@ export default function ProjectsHubPage() {
           </main>
         </SidebarInset>
       </SidebarProvider>
+
+      <CreateProjectModal
+        open={createProjectOpen}
+        onClose={() => setCreateProjectOpen(false)}
+        onCreated={async (project) => {
+          await refetch();
+          startTimedGlobalLoading(
+            "project-created",
+            DEFAULT_LOADING_DURATION_MS + 120,
+          );
+          navigate(`/projects/${project.id}/backlog`, { withLoading: false });
+        }}
+      />
     </div>
   );
 }
