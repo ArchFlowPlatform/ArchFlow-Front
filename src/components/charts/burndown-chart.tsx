@@ -26,8 +26,21 @@ interface ChartPoint extends BurndownPoint {
 }
 
 const NUM_GRID_LINES = 5;
-const IDEAL_LINE_STROKE = "rgba(255,255,255,0.35)";
-const ACTUAL_LINE_STROKE = "var(--af-pin, #6D28D9)";
+
+/** Single source of truth for burndown line series — used by `<Line>` and the legend. */
+export const BURNDOWN_CHART_SERIES = {
+  ideal: {
+    stroke: "rgba(255,255,255,0.35)",
+    strokeDasharray: "6 6",
+    strokeWidth: 2,
+    label: "Ideal remaining",
+  },
+  actual: {
+    stroke: "var(--af-pin, #6D28D9)",
+    strokeWidth: 2.5,
+    label: "Actual remaining",
+  },
+} as const;
 
 function formatHours(value: number): string {
   const rounded = Math.round(value * 10) / 10;
@@ -134,19 +147,47 @@ export default function BurndownChart({
             Remaining hours (Actual vs Ideal)
           </p>
         </div>
-        <div className="af-text-secondary flex flex-wrap items-center gap-2 text-[10px]">
-          <span className="af-surface-sm af-accent-chip inline-flex items-center px-2 py-0.5">
-            <span className="mr-1 inline-block h-1 w-4 bg-[var(--af-pin)]" />
-            Scope:&nbsp;{formatHours(scopeHours)}
-          </span>
-          <span className="af-surface-sm af-accent-chip inline-flex items-center px-2 py-0.5">
-            <span className="mr-1 inline-block h-1 w-4 bg-[var(--af-pin)]/70" />
-            Burned:&nbsp;{formatHours(burnedHours)}
-          </span>
-          <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5">
-            <span className="mr-1 inline-block h-1 w-4 bg-white/60" />
-            Remaining:&nbsp;{formatHours(remainingHours)}
-          </span>
+        <div className="flex flex-col items-end gap-2">
+          <div
+            className="af-text-secondary flex flex-wrap items-center justify-end gap-3 text-[10px]"
+            role="list"
+            aria-label="Séries do gráfico"
+          >
+            <span className="inline-flex items-center gap-1.5" role="listitem">
+              <span
+                className="inline-block w-8 shrink-0 border-t-2 border-dashed"
+                style={{
+                  borderColor: BURNDOWN_CHART_SERIES.ideal.stroke,
+                }}
+                aria-hidden
+              />
+              <span>{BURNDOWN_CHART_SERIES.ideal.label}</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5" role="listitem">
+              <span
+                className="inline-block h-0.5 w-8 shrink-0 rounded-sm"
+                style={{
+                  backgroundColor: BURNDOWN_CHART_SERIES.actual.stroke,
+                }}
+                aria-hidden
+              />
+              <span>{BURNDOWN_CHART_SERIES.actual.label}</span>
+            </span>
+          </div>
+          <div className="af-text-secondary flex flex-wrap items-center justify-end gap-2 text-[10px]">
+            <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5">
+              <span className="af-text-tertiary mr-1.5 text-[9px] uppercase tracking-wide">
+                Métricas
+              </span>
+              Scope&nbsp;{formatHours(scopeHours)}
+            </span>
+            <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5">
+              Burned&nbsp;{formatHours(burnedHours)}
+            </span>
+            <span className="af-surface-sm inline-flex items-center bg-white/5 px-2 py-0.5">
+              Remaining&nbsp;{formatHours(remainingHours)}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -188,9 +229,9 @@ export default function BurndownChart({
             <Line
               type="monotone"
               dataKey="idealRemaining"
-              stroke={IDEAL_LINE_STROKE}
-              strokeWidth={2}
-              strokeDasharray="6 6"
+              stroke={BURNDOWN_CHART_SERIES.ideal.stroke}
+              strokeWidth={BURNDOWN_CHART_SERIES.ideal.strokeWidth}
+              strokeDasharray={BURNDOWN_CHART_SERIES.ideal.strokeDasharray}
               dot={false}
               activeDot={false}
               isAnimationActive={false}
@@ -198,8 +239,8 @@ export default function BurndownChart({
             <Line
               type="monotone"
               dataKey="actualRemaining"
-              stroke={ACTUAL_LINE_STROKE}
-              strokeWidth={2.5}
+              stroke={BURNDOWN_CHART_SERIES.actual.stroke}
+              strokeWidth={BURNDOWN_CHART_SERIES.actual.strokeWidth}
               dot={false}
               activeDot={false}
               isAnimationActive={false}

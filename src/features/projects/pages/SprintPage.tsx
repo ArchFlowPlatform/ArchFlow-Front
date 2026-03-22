@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import ProjectShell from "@/components/layout/ProjectShell";
 import { useProjectSprint } from "@/contexts/ProjectSprintContext";
@@ -15,6 +15,8 @@ import { useSprintViewModel } from "../hooks/useSprintViewModel";
 import CreateSprintModal from "@/components/sprint/CreateSprintModal";
 import InlineToast from "@/components/ui/InlineToast";
 import { useToast } from "@/hooks/useToast";
+import { updateSprint } from "@/features/sprints/api/sprints.api";
+import type { SprintStatus } from "@/types/enums";
 
 interface SprintPageProps {
   projectId?: string;
@@ -46,6 +48,7 @@ const PLACEHOLDER_USER = {
 export default function SprintPage({ projectId }: SprintPageProps) {
   const [query, setQuery] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [sprintStatusSaving, setSprintStatusSaving] = useState(false);
 
   const effectiveProjectId = projectId ?? "";
   const { user } = useAuth();
@@ -57,7 +60,7 @@ export default function SprintPage({ projectId }: SprintPageProps) {
     refetchSprints,
     setSelectedSprintId,
   } = useProjectSprint(effectiveProjectId || "");
-  const { toast, showError } = useToast();
+  const { toast, showError, showSuccess } = useToast();
   const {
     taskViews,
     burndownPoints,
@@ -87,6 +90,31 @@ export default function SprintPage({ projectId }: SprintPageProps) {
           .includes(normalizedQuery),
       ),
     [normalizedQuery, taskViews],
+  );
+
+  const handleSprintStatusChange = useCallback(
+    async (next: SprintStatus) => {
+      if (!selectedSprintId) return;
+      setSprintStatusSaving(true);
+      try {
+        await updateSprint(effectiveProjectId, selectedSprintId, {
+          status: next,
+        });
+        await refetchSprints();
+        showSuccess("Status atualizado", "O status da sprint foi salvo.");
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setSprintStatusSaving(false);
+      }
+    },
+    [
+      effectiveProjectId,
+      selectedSprintId,
+      refetchSprints,
+      showError,
+      showSuccess,
+    ],
   );
 
   if (!sprints.length || !selectedSprintId) {
@@ -231,6 +259,8 @@ export default function SprintPage({ projectId }: SprintPageProps) {
               remainingHours={remainingHours}
               periodLabel={periodLabel}
               onCreateSprint={() => setCreateModalOpen(true)}
+              onSprintStatusChange={handleSprintStatusChange}
+              statusSaving={sprintStatusSaving}
             />
 
             <section className="af-surface-lg min-w-0 w-full bg-[#14121a]/70 px-4 py-4 sm:px-5 sm:py-4">

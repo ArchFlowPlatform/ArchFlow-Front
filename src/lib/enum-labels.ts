@@ -1,6 +1,7 @@
 import type {
   BusinessValue,
   EpicStatus,
+  SprintStatus,
   UserStoryStatus,
   UserStoryComplexity,
 } from "@/types/enums";
@@ -37,6 +38,19 @@ export const COMPLEXITY_OPTIONS: readonly EnumOption<UserStoryComplexity>[] = [
   { value: "high", label: "Alta", cls: "bg-red-500/20 text-red-300" },
   { value: "very_high", label: "Muito Alta", cls: "bg-red-600/25 text-red-300" },
 ] as const;
+
+/** Domain values match `SprintSchema` / backend `SprintStatus`. */
+export const SPRINT_STATUS_OPTIONS: readonly EnumOption<SprintStatus>[] = [
+  { value: "planned", label: "Planejada", cls: "bg-white/5 text-white/72" },
+  { value: "active", label: "Ativa", cls: "af-accent-chip-strong text-white" },
+  { value: "completed", label: "Concluída", cls: "bg-emerald-500/15 text-emerald-300" },
+  { value: "cancelled", label: "Cancelada", cls: "bg-red-500/15 text-red-300" },
+] as const;
+
+/** For `SelectDropdown` / inline selects — labels and values only. */
+export const SPRINT_STATUS_SELECT_OPTIONS = SPRINT_STATUS_OPTIONS.map(
+  ({ value, label }) => ({ value, label }),
+);
 
 export function getLabelFor<V extends string>(
   options: readonly EnumOption<V>[],

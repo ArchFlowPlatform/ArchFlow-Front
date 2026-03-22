@@ -22,7 +22,7 @@ interface ModalShellProps {
 /**
  * Shared modal overlay/panel.
  * Mirrors the visual language of KanbanModal:
- * dark glass surface, Escape to close, backdrop click to close.
+ * Escape closes the modal; backdrop clicks do not (avoids losing form data).
  */
 export default function ModalShell({
   open,
@@ -49,13 +49,9 @@ export default function ModalShell({
   const hasSidebar = Boolean(sidebar);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-[2px]">
       <div
         className={`af-surface-lg flex max-h-[90vh] w-full flex-col overflow-hidden bg-[#14121a]/96 ${maxWidth}`}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <header className="af-separator-b flex shrink-0 items-start justify-between gap-3 px-5 py-4">

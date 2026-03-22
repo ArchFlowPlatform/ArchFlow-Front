@@ -1,4 +1,11 @@
+import { InlineSelect } from "@/components/backlog/InlineEditField";
+import {
+  SPRINT_STATUS_OPTIONS,
+  SPRINT_STATUS_SELECT_OPTIONS,
+  getBadgeFor,
+} from "@/lib/enum-labels";
 import type { Sprint } from "@/types/sprint";
+import type { SprintStatus } from "@/types/enums";
 
 interface SprintSummaryCardProps {
   sprint: Sprint;
@@ -7,6 +14,9 @@ interface SprintSummaryCardProps {
   remainingHours: number;
   periodLabel: string;
   onCreateSprint?: () => void;
+  /** When provided, status badge becomes inline-editable (PATCH sprint `status`). */
+  onSprintStatusChange?: (next: SprintStatus) => Promise<void>;
+  statusSaving?: boolean;
 }
 
 function formatHours(value: number): string {
@@ -17,12 +27,6 @@ function formatHours(value: number): string {
   return `${rounded.toFixed(1)}h`;
 }
 
-function formatStatusLabel(status: Sprint["status"]): string {
-  if (status === "active") return "active";
-  if (status === "completed") return "completed";
-  return "planned";
-}
-
 export default function SprintSummaryCard({
   sprint,
   scopeHours,
@@ -30,8 +34,11 @@ export default function SprintSummaryCard({
   remainingHours,
   periodLabel,
   onCreateSprint,
+  onSprintStatusChange,
+  statusSaving = false,
 }: SprintSummaryCardProps) {
   const capacity = sprint.capacityHours;
+  const statusBadge = getBadgeFor(SPRINT_STATUS_OPTIONS, sprint.status);
 
   const registeredRatio =
     capacity > 0 ? Math.min(burnedHours / capacity, 1) : 0;
@@ -50,15 +57,27 @@ export default function SprintSummaryCard({
               <h2 className="truncate text-sm font-semibold text-white">
                 {sprint.name}
               </h2>
-              <span
-                className={`af-surface-sm inline-flex items-center px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                  sprint.status === "active"
-                    ? "af-accent-chip-strong text-white"
-                    : "bg-white/5 text-white/72"
-                }`}
-              >
-                {formatStatusLabel(sprint.status)}
-              </span>
+              {onSprintStatusChange && !sprint.isArchived ? (
+                <InlineSelect
+                  value={sprint.status}
+                  displayLabel={statusBadge.label}
+                  badgeCls={`${statusBadge.cls} text-[10px] font-semibold uppercase tracking-[0.16em]`}
+                  options={SPRINT_STATUS_SELECT_OPTIONS}
+                  saving={statusSaving}
+                  className="!inline-flex items-center gap-1"
+                  onSave={async (v) => {
+                    await onSprintStatusChange(v as SprintStatus);
+                  }}
+                />
+              ) : (
+                <span
+                  className={`af-surface-sm inline-flex items-center px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                    statusBadge.cls || "bg-white/5 text-white/72"
+                  }`}
+                >
+                  {statusBadge.label}
+                </span>
+              )}
 
             {onCreateSprint ? (
               <button

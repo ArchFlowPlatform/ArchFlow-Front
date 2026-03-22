@@ -3,7 +3,7 @@
  * Align with backend DTOs when documented. Used by API modules (Step 3+).
  */
 
-import type { MemberRole, ProjectStatus, UserType } from "./enums";
+import type { MemberRole, ProjectStatus, SprintStatus, UserType } from "./enums";
 
 // ----- Users (POST /api/users) — plan §2.2 -----
 
@@ -125,6 +125,8 @@ export interface UpdateSprintRequest {
   startDate?: string;
   endDate?: string;
   capacityHours?: number;
+  /** Sprint lifecycle; aligns with `SprintStatus` / PATCH `api/projects/.../sprints/{id}`. */
+  status?: SprintStatus;
 }
 
 // ----- Sprint items -----
